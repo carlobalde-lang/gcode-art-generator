@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>G-Code Art Generator</title>
+        <style>
+            :root {
+                --primary: #7c3aed;
+                --bg: #f8fafc;
+                --panel: #ffffff;
+            }
+            body {
+                font-family: "Segoe UI", sans-serif;
+                background: var(--bg);
+                padding: 20px;
+                color: #333;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                display: grid;
+                grid-template-columns: 1fr 2fr;
+                gap: 20px;
+            }
+            .panel {
+                background: var(--panel);
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            }
+            h1 {
+                grid-column: 1 / -1;
+                text-align: center;
+                color: var(--primary);
+            }
+
+            .control-group {
+                margin-bottom: 12px;
+            }
+            label {
+                display: block;
+                font-weight: 600;
+                margin-bottom: 4px;
+                font-size: 0.9em;
+            }
+            input,
+            select {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                box-sizing: border-box;
+            }
+
+            button {
+                background: var(--primary);
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 6px;
+                cursor: pointer;
+                width: 100%;
+                font-size: 1em;
+                font-weight: bold;
+                margin-top: 10px;
+                transition: background 0.2s;
+            }
+            button:hover {
+                background: #6d28d9;
+            }
+            button.secondary {
+                background: #64748b;
+                margin-top: 5px;
+            }
+
+            /* Added pixel size definition in JS, but keeping max-width for responsiveness */
+            canvas#previewCanvas {
+                max-width: 100%;
+                height: auto;
+                border: 1px solid #94a3b8;
+                margin-top: 10px;
+                background: #e2e8f0;
+                cursor: grab; /* Indicates it's draggable */
+            }
+            .preview-container {
+                text-align: center;
+            }
+            .stats {
+                margin-top: 15px;
+                font-size: 0.85em;
+                color: #666;
+                background: #f1f5f9;
+                padding: 10px;
+                border-radius: 4px;
+            }
+            .highlight {
+                background: #fee2e2;
+                border-left: 5px solid #ef4444;
+                padding: 8px;
+                margin-top: 10px;
+            }
+            .checkbox-group {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-top: 5px;
+                background: #f0fdf4;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            .checkbox-group input {
+                width: auto;
+                margin: 0;
+            }
+            .warning {
+                background: #fef2f2;
+                color: #dc2626;
+                padding: 10px;
+                border-radius: 6px;
+                margin-top: 15px;
+                border-left: 4px solid #f87171;
+                font-size: 0.9em;
+                grid-column: 1 / -1;
+            }
+            .info {
+                background: #eff6ff;
+                color: #1e40af;
+                padding: 10px;
+                border-radius: 6px;
+                margin-top: 15px;
+                border-left: 4px solid #60a5fa;
+                font-size: 0.9em;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>🌀 G-Code Art Generator</h1>
+        <div class="container">
+            <div class="warning">
+                ⚠️ **ATTENTION:** This code is optimized to be **pasted** as a central G-code block in your Slicer. It
+                does not contain Homing (G28) or Heating commands (M109/M140).
+            </div>
+            <div class="panel">
+                <h3>1. Image upload</h3>
+                <input type="file" id="imageInput" accept="image/*" />
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="mirrorimage" />
+                    <label for="mirrorimage" style="margin: 0; cursor: pointer">Mirror image</label>
+                </div>
+                <div class="checkbox-group" style="margin-top: 10px; background: #fffbeb">
+                    <input type="checkbox" id="hideImageOverlay" checked />
+                    <label for="hideImageOverlay" style="margin: 0; cursor: pointer">Show Image Preview Overlay</label>
+                </div>
+
+                <div
+                    class="control-group"
+                    style="margin-top: 10px; background: #eef2ff; padding: 10px; border-radius: 4px">
+                    <label>📍 Path Type</label>
+                    <select id="pathType">
+                        <option value="spiral">Spiral</option>
+                        <option value="zigzag">Zig-Zag (Horizontal)</option>
+                        <option value="squareSpiral">Square Spiral</option>
+                        <option value="hilbert">Hilbert Curve (Fractal)</option>
+                        <option value="diagonal">Diagonals</option>
+                    </select>
+                </div>
+                <div class="control-group" style="background: #fefce8; padding: 10px; border-radius: 4px">
+                    <label>📉 Hilbert Density</label>
+                    <input
+                        type="range"
+                        id="hilbertOrder"
+                        min="3"
+                        max="8"
+                        step="1"
+                        value="6"
+                        oninput="document.getElementById('orderVal').innerText=this.value" />
+                    <span id="orderVal" style="float: right; font-size: 0.8em">6</span>
+                </div>
+
+                <div class="control-group highlight">
+                    <label>📐 Bed Size (mm)</label>
+                    <input type="number" id="bedSize" value="250" title="Total X/Y bed dimensions" />
+                </div>
+
+                <h3>2. Print Parameters</h3>
+                <div class="control-group">
+                    <label>Filament Diameter (mm)</label>
+                    <input type="number" id="filamentDia" value="1.75" step="0.01" />
+                </div>
+                <div class="control-group">
+                    <label>Layer Height (mm)</label>
+                    <input type="number" id="layerHeight" value="0.2" step="0.01" />
+                </div>
+                <div class="control-group">
+                    <label>Z-Offset / Start Z (mm)</label>
+                    <input type="number" id="zOffset" value="0.2" step="0.01" />
+                </div>
+
+                <h3>3. Lines & Effects</h3>
+                <div class="control-group">
+                    <label>📐 Print Dimensions (mm) - Proportional</label>
+                    <div style="display: flex; gap: 10px">
+                        <input type="number" id="printWidth" value="180" step="1" title="Final print Width (X)" />
+                        <input type="number" id="printHeight" value="180" step="1" title="Final print Height (Y)" />
+                    </div>
+                    <p id="imageRatioInfo" style="font-size: 0.8em; color: #6b7280; margin-top: 5px">
+                        Image Ratio: Upload an image
+                    </p>
+                </div>
+                <div class="control-group">
+                    <label>Line Spacing (mm)</label>
+                    <input type="number" id="lineSpacing" value="1.0" step="0.1" />
+                </div>
+                <div class="control-group">
+                    <label>MIN Line Width (Light)</label>
+                    <input type="number" id="minLineWidth" value="0.2" step="0.1" />
+                </div>
+                <div class="control-group">
+                    <label>MAX Line Width (Dark)</label>
+                    <input type="number" id="maxLineWidth" value="0.8" step="0.1" />
+                </div>
+
+                <div
+                    class="control-group"
+                    style="background: #eef7ff; padding: 10px; border-radius: 4px; margin-top: 10px">
+                    <label>⚡ Min/Max Speed (mm/s)</label>
+                    <div style="display: flex; gap: 10px">
+                        <input
+                            type="number"
+                            id="minSpeed"
+                            value="10"
+                            step="0.1"
+                            title="Speed for black (Slow/Glossy)" />
+                        <input
+                            type="number"
+                            id="maxSpeed"
+                            value="100"
+                            step="0.1"
+                            title="Speed for white (Fast/Matte)" />
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>🌗 Gamma Correction (1.0 = Neutral)</label>
+                    <input
+                        type="range"
+                        id="gamma"
+                        min="0.5"
+                        max="3.0"
+                        step="0.1"
+                        value="1.5"
+                        oninput="document.getElementById('gammaVal').innerText=this.value" />
+                    <span id="gammaVal" style="float: right; font-size: 0.8em">1.5</span>
+                </div>
+
+                <div
+                    class="control-group"
+                    style="background: #fefce8; padding: 10px; border-radius: 4px; margin-top: 10px">
+                    <label>〰️ Max Squiggle Amplitude (mm, 0 disables)</label>
+                    <input
+                        type="number"
+                        id="squiggleAmp"
+                        value="0.3"
+                        step="0.1"
+                        title="Maximum wobble amplitude for deep black" />
+                    <label>Squiggle Frequency (cycles per mm)</label>
+                    <input
+                        type="number"
+                        id="squiggleFreq"
+                        value="1"
+                        step="0.1"
+                        title="How many wobble cycles per mm of travel" />
+                </div>
+                <button onclick="processImage()">🚀 Generate Preview and G-code</button>
+                <button class="secondary" id="downloadBtn" style="display: none" onclick="downloadGcode()">
+                    📥 Download G-Code
+                </button>
+
+                <div id="stats" class="stats" style="display: none"></div>
+            </div>
+            <div class="panel preview-container">
+                <h3>Path Preview</h3>
+                <div class="info">
+                    **Zoom & Pan:** Click and drag to pan. Mouse wheel to zoom. Click "Generate" to apply changes to
+                    G-code.
+                </div>
+                <canvas id="previewCanvas"></canvas>
+            </div>
+        </div>
+        <canvas id="hiddenCanvas" style="display: none"></canvas>
+        <script>
+            "use strict";
+            // --- MATHEMATICAL CONSTANTS & UTILITIES ---
+            const TWO_PI = 2 * Math.PI;
+            // Hilbert Curve (Base 2)
+            function hilbert(order, d) {
+                let x = 0,
+                    y = 0;
+                let rx, ry, s;
+                let t = d;
+                const n = 1 << order;
+
+                for (s = 1; s < n; s *= 2) {
+                    rx = 1 & (t / 2);
+                    ry = 1 & (t ^ rx);
+
+                    if (ry === 0) {
+                        if (rx === 1) {
+                            x = s - 1 - x;
+                            y = s - 1 - y;
+                        }
+                        [x, y] = [y, x]; // Swap x and y
+                    }
+                    x += s * rx;
+                    y += s * ry;
+                    t = Math.floor(t / 4);
+                }
+                return { x: x, y: y };
+            }
+
+            // --- GLOBAL VARIABLES & DOM REFERENCES ---
+            let gcodeContent = "";
+            let originalImage = null;
+            let originalImageRatio = 1.0;
+
+            const imageInput = document.getElementById("imageInput");
+            const hiddenCanvas = document.getElementById("hiddenCanvas");
+            const ctx = hiddenCanvas.getContext("2d");
+            const previewCanvas = document.getElementById("previewCanvas");
+            const previewCtx = previewCanvas.getContext("2d");
+            const printWidthInput = document.getElementById("printWidth");
+            const printHeightInput = document.getElementById("printHeight");
+
+            // Pan & Zoom State Variables
+            const PREVIEW_SCALE = 3;
+            let imageOffsetX = 0.0;
+            let imageOffsetY = 0.0;
+            let imageZoom = 1.0;
+            let isDragging = false;
+            let lastMouseX = 0;
+            let lastMouseY = 0;
+
+            // --- PROPORTIONAL LOGIC ---
+            function updatePrintHeightFromWidth(newWidth) {
+                if (originalImage) {
+                    printHeightInput.value = (newWidth / originalImageRatio).toFixed(2);
+                }
+            }
+
+            function updatePrintWidthFromHeight(newHeight) {
+                if (originalImage) {
+                    printWidthInput.value = (newHeight * originalImageRatio).toFixed(2);
+                }
+            }
+
+            printWidthInput.addEventListener("input", () => {
+                updatePrintHeightFromWidth(parseFloat(printWidthInput.value));
+            });
+            printHeightInput.addEventListener("input", () => {
+                updatePrintWidthFromHeight(parseFloat(printHeightInput.value));
+            });
+
+            function drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight) {
+                if (!originalImage) return;
+
+                // 1. Clear and setup Canvas (Y-up for G-code visual alignment)
+                previewCtx.setTransform(1, 0, 0, 1, 0, 0);
+                previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+                // Configura il contesto globale per Y-up (l'origine è in basso a sinistra del letto)
+                previewCtx.translate(0, previewCanvas.height);
+                previewCtx.scale(PREVIEW_SCALE, -PREVIEW_SCALE);
+
+                // 2. Draw Bed Boundary
+                previewCtx.strokeStyle = "#cbd5e1";
+                previewCtx.lineWidth = 1;
+                previewCtx.strokeRect(0, 0, bedSize, bedSize);
+
+                const hideImageOverlayChecked = document.getElementById("hideImageOverlay").checked;
+
+                if (hideImageOverlayChecked) {
+
+                    const sX_norm = imageOffsetX;
+                    const sY_norm = imageOffsetY;
+                    const sW_norm = 1.0 / imageZoom;
+                    const sH_norm = 1.0 / imageZoom;
+
+                    previewCtx.save();
+                    previewCtx.translate(offsetX, offsetY);
+                    previewCtx.scale(1, -1);
+                    previewCtx.translate(0, -printHeight);
+
+                    const mirrorimage = document.getElementById("mirrorimage").checked;
+                    if (mirrorimage) {
+                        previewCtx.translate(printWidth, 0);
+                        previewCtx.scale(-1, 1);
+                    }
+
+                    previewCtx.drawImage(
+                        originalImage,
+                        originalImage.width * sX_norm,
+                        originalImage.height * sY_norm,
+                        originalImage.width * sW_norm,
+                        originalImage.height * sH_norm,
+                        0,
+                        0,
+                        printWidth,
+                        printHeight
+                    );
+
+                    previewCtx.restore(); 
+                } 
+
+                previewCtx.strokeStyle = "#ef4444";
+                previewCtx.lineWidth = 1;
+                previewCtx.strokeRect(offsetX, offsetY, printWidth, printHeight);
+            }
+
+            // --- IMAGE MANIPULATION HANDLERS (Pan & Zoom) ---
+            function setupImageManipulationHandlers() {
+                const pC = previewCanvas;
+
+                const getPrintParams = () => {
+                    const bedSize = parseFloat(document.getElementById("bedSize").value) || 250;
+                    const printWidth = parseFloat(printWidthInput.value) || 100;
+                    const printHeight = parseFloat(printHeightInput.value) || 100;
+                    const offsetX = (bedSize - printWidth) / 2;
+                    const offsetY = (bedSize - printHeight) / 2;
+                    return { bedSize, printWidth, printHeight, offsetX, offsetY };
+                };
+
+                // --- Panning ---
+                pC.addEventListener("mousedown", (e) => {
+                    if (!originalImage) return;
+                    isDragging = true;
+                    lastMouseX = e.clientX;
+                    lastMouseY = e.clientY;
+                    pC.style.cursor = "grabbing";
+                });
+
+                document.addEventListener("mouseup", () => {
+                    isDragging = false;
+                    pC.style.cursor = "grab";
+                });
+
+                pC.addEventListener("mousemove", (e) => {
+                    if (!isDragging || !originalImage) return;
+
+                    const { bedSize, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
+
+                    const dx = e.clientX - lastMouseX;
+                    const dy = e.clientY - lastMouseY;
+                    lastMouseX = e.clientX;
+                    lastMouseY = e.clientY;
+
+                    const areaWidthOnScreen = printWidth * PREVIEW_SCALE;
+                    const areaHeightOnScreen = printHeight * PREVIEW_SCALE;
+
+                    // Normalized delta (0..1 over the print area)
+                    const uvDeltaX = dx / areaWidthOnScreen;
+                    const uvDeltaY = dy / areaHeightOnScreen;
+
+                    // Update offsets
+                    imageOffsetX -= uvDeltaX / imageZoom;
+                    imageOffsetY += uvDeltaY / imageZoom; 
+
+                    // Clamp offsets
+                    const maxOffset = 1 - 1 / imageZoom;
+                    imageOffsetX = Math.max(0, Math.min(maxOffset, imageOffsetX));
+                    imageOffsetY = Math.max(0, Math.min(maxOffset, imageOffsetY));
+
+                    drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+                });
+
+                // --- Zooming ---
+                pC.addEventListener(
+                    "wheel",
+                    (e) => {
+                        if (!originalImage) return;
+                        e.preventDefault();
+
+                        const { bedSize, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
+
+                        const rect = pC.getBoundingClientRect();
+                        // Mouse X/Y relative to the canvas in mm units
+                        const mouseX_mm = (e.clientX - rect.left) / PREVIEW_SCALE;
+                        // Mouse Y in mm units (Y-up)
+                        const mouseY_mm = (pC.height - (e.clientY - rect.top)) / PREVIEW_SCALE;
+
+                        // Print UV coordinates (0..1, Y-up print coord)
+                        const u_print = (mouseX_mm - offsetX) / printWidth;
+                        const v_print = (mouseY_mm - offsetY) / printHeight;
+
+                        // Clamp (0..1)
+                        const u_clamped = Math.max(0, Math.min(1, u_print));
+                        const v_clamped = Math.max(0, Math.min(1, v_print));
+
+                        // V-Source is Y-down: v_print (Y-up) -> (1.0 - v_print) (Y-down)
+                        const v_print_ydown = 1.0 - v_clamped;
+
+                        // Current Source UV (Y-down) corresponding to the clamped mouse point
+                        const u_source_old = u_clamped / imageZoom + imageOffsetX;
+                        const v_source_old = v_print_ydown / imageZoom + imageOffsetY;
+
+                        // Apply the zoom change
+                        const zoomDelta = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+                        let newZoom = imageZoom * zoomDelta;
+
+                        // Clamp zoom (min 1.0, max 10.0)
+                        imageZoom = Math.max(1.0, Math.min(10.0, newZoom));
+
+                        // Recalculate offset (pinching effect)
+                        let newOffsetX = u_source_old - u_clamped / imageZoom;
+                        let newOffsetY = v_source_old - v_print_ydown / imageZoom;
+
+                        // Clamp offsets again
+                        const maxOffset = 1 - 1 / imageZoom;
+                        newOffsetX = Math.max(0, Math.min(maxOffset, newOffsetX));
+                        newOffsetY = Math.max(0, Math.min(maxOffset, newOffsetY));
+
+                        imageOffsetX = newOffsetX;
+                        imageOffsetY = newOffsetY;
+
+                        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+                    },
+                    { passive: false }
+                );
+            }
+
+            // --- IMAGE LOADING EVENT LISTENER ---
+            imageInput.addEventListener("change", function (e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    originalImage = new Image();
+                    originalImage.onload = function () {
+                        originalImageRatio = originalImage.width / originalImage.height;
+
+                        document.getElementById("imageRatioInfo").innerText =
+                            `Image Ratio: ${originalImage.width}x${originalImage.height}px (X/Y Ratio: ${originalImageRatio.toFixed(2)}:1)`;
+
+                        updatePrintHeightFromWidth(parseFloat(printWidthInput.value));
+
+                        imageZoom = 1.0;
+                        imageOffsetX = 0.0;
+                        imageOffsetY = 0.0;
+
+                        const bedSize = parseFloat(document.getElementById("bedSize").value) || 250;
+                        previewCanvas.width = bedSize * PREVIEW_SCALE;
+                        previewCanvas.height = bedSize * PREVIEW_SCALE;
+
+                        const printWidth = parseFloat(printWidthInput.value) || 100;
+                        const printHeight = parseFloat(printHeightInput.value) || 100;
+                        const offsetX = (bedSize - printWidth) / 2;
+                        const offsetY = (bedSize - printHeight) / 2;
+                        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+                    };
+                    originalImage.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // --- BRIGHTNESS FUNCTION WITH GAMMA (OPTIMIZED) ---
+            function getBrightnessAtUV(u_print, v_print_yup, pixels, anaW, anaH, gammaVal) {
+                // 1. Convert Y-up print V to Y-down image V
+                const v_print_ydown = 1.0 - v_print_yup;
+
+                // 2. Apply Pan and Zoom to map print coordinates to Image Source Coordinates (u_source, v_source, Y-down)
+                let u_source = u_print / imageZoom + imageOffsetX;
+                let v_source = v_print_ydown / imageZoom + imageOffsetY;
+
+                // 3. Clamp u_source, v_source (redundant if offsets are clamped, but safe)
+                u_source = Math.max(0, Math.min(1, u_source));
+                v_source = Math.max(0, Math.min(1, v_source));
+
+                // 4. Map source UV coordinates to the analysis canvas dimensions
+                const x = Math.floor(u_source * (anaW - 1));
+                const y = Math.floor(v_source * (anaH - 1));
+
+                const idx = (y * anaW + x) * 4;
+
+                const avgColor = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3.0;
+                let val = avgColor / 255.0;
+
+                // Gamma Correction
+                val = Math.pow(val, 1.0 / gammaVal);
+
+                // Return "Darkness" (1.0 = Black/Thick, 0.0 = White/Thin)
+                return 1.0 - val;
+            }
+
+            // --- MAIN PROCESS ---
+            function processImage() {
+                if (!originalImage) {
+                    alert("Please upload an image first!");
+                    return;
+                }
+
+                // Reading Parameters
+                const pathType = document.getElementById("pathType").value;
+                const filamentDia = parseFloat(document.getElementById("filamentDia").value) || 1.75;
+                const layerHeight = parseFloat(document.getElementById("layerHeight").value) || 0.2;
+                const zOffset = parseFloat(document.getElementById("zOffset").value) || 0.2;
+                const bedSize = parseFloat(document.getElementById("bedSize").value) || 250;
+
+                const printWidth = parseFloat(printWidthInput.value) || 100;
+                const printHeight = parseFloat(printHeightInput.value) || 100;
+
+                const spacing = parseFloat(document.getElementById("lineSpacing").value) || 0.6;
+                const minW = parseFloat(document.getElementById("minLineWidth").value) || 0.3;
+                const maxW = parseFloat(document.getElementById("maxLineWidth").value) || 0.8;
+                const mirrorimage = document.getElementById("mirrorimage").checked;
+
+                const minSpeedMMS = parseFloat(document.getElementById("minSpeed").value) || 15;
+                const maxSpeedMMS = parseFloat(document.getElementById("maxSpeed").value) || 60;
+                const minSpeed = minSpeedMMS * 60;
+                const maxSpeed = maxSpeedMMS * 60;
+                const gammaVal = parseFloat(document.getElementById("gamma").value) || 1.5;
+                const squiggleAmp = parseFloat(document.getElementById("squiggleAmp").value) || 0.0;
+                const squiggleFreq = parseFloat(document.getElementById("squiggleFreq").value) || 5;
+                const useSquiggle = squiggleAmp > 0.01;
+                const fractalOrder = parseInt(document.getElementById("hilbertOrder").value) || 6;
+
+                // --- 1. Image Analysis Setup ---
+                const anaW = originalImage.width;
+                const anaH = originalImage.height;
+
+                hiddenCanvas.width = anaW;
+                hiddenCanvas.height = anaH;
+                ctx.drawImage(originalImage, 0, 0, anaW, anaH);
+                const pixels = ctx.getImageData(0, 0, anaW, anaH).data;
+
+                // Calculations
+                const offsetX = (bedSize - printWidth) / 2;
+                const offsetY = (bedSize - printHeight) / 2;
+                const filArea = Math.PI * Math.pow(filamentDia / 2, 2);
+                const safeZ = zOffset + 5.0;
+                let totalE = 0;
+
+                previewCanvas.width = bedSize * PREVIEW_SCALE;
+                previewCanvas.height = bedSize * PREVIEW_SCALE;
+                drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+
+                // --- 2. G-Code Header & Setup ---
+                let gcode = [];
+                gcode.push(`; --- G-Code Art Generator v6.3 (Zoomed) ---`);
+                gcode.push(`G90 ; Absolute Coordinates (XYZE)`);
+                gcode.push(`M83 ; Relative Extrusion`);
+
+                // --- 3. Calculation and Travel Starting Point ---
+                let startPoint = { x: offsetX, y: offsetY };
+                const printDim = Math.min(printWidth, printHeight);
+                const centerOffset = {
+                    x: offsetX + (printWidth - printDim) / 2,
+                    y: offsetY + (printHeight - printDim) / 2
+                };
+
+                if (["spiral", "squareSpiral"].includes(pathType)) {
+                    startPoint = { x: offsetX + printWidth / 2, y: offsetY + printHeight / 2 };
+                } else if (pathType === "hilbert") {
+                    const order = fractalOrder;
+                    const N = 1 << order;
+                    const step = printDim / N;
+                    let p0 = hilbert(order, 0);
+                    startPoint = { x: centerOffset.x + p0.x * step, y: centerOffset.y + p0.y * step };
+                }
+
+                let prevX = startPoint.x;
+                let prevY = startPoint.y;
+
+                gcode.push(`G0 Z${safeZ.toFixed(3)} F3000 ; Lift to safe Z`);
+                gcode.push(`G0 X${prevX.toFixed(3)} Y${prevY.toFixed(3)} F6000 ; Travel to starting point`);
+                gcode.push(`G1 Z${zOffset.toFixed(3)} F1000 ; Descend to print height`);
+
+                // --- 4. Movement/Extrusion Function ---
+                function writeMove(x, y, targetW, targetF, isTravel = false) {
+                    const dist = Math.hypot(x - prevX, y - prevY); // Optimization: Use Math.hypot
+
+                    if (isTravel || dist < 0.01) {
+                        gcode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} F6000`);
+                        // Travel Preview
+                        previewCtx.beginPath();
+                        previewCtx.moveTo(prevX, prevY);
+                        previewCtx.lineTo(x, y);
+                        previewCtx.lineWidth = 1 / PREVIEW_SCALE;
+                        previewCtx.lineCap = "round";
+                        previewCtx.strokeStyle = `rgba(0,0,0, 0.4)`;
+                        previewCtx.stroke();
+                    } else {
+                        const vol = dist * targetW * layerHeight;
+                        const e = vol / filArea;
+                        gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(5)} F${targetF.toFixed(0)}`);
+                        totalE += e;
+
+                        // Print Preview
+                        previewCtx.beginPath();
+                        previewCtx.moveTo(prevX, prevY);
+                        previewCtx.lineTo(x, y);
+                        previewCtx.lineWidth = targetW;
+                        previewCtx.lineCap = "round";
+                        previewCtx.strokeStyle = `rgba(0,0,0, 0.9)`;
+                        previewCtx.stroke();
+                    }
+                    prevX = x;
+                    prevY = y;
+                    return dist;
+                }
+
+                function doSmartMove(x, y, isConnect = false) {
+                    let u = (x - offsetX) / printWidth;
+                    let v_yup = (y - offsetY) / printHeight;
+
+                    // V_yup (0=Bottom, 1=Top) must be passed to getBrightnessAtUV for Y-down image mapping
+                    let u_sample = u;
+                    let v_sample_yup = v_yup;
+
+                    // 2. Apply Full 180° Rotation (if checked)
+                    if (mirrorimage) {
+                        u_sample = 1.0 - u;
+                    }
+
+                    const darkness = getBrightnessAtUV(u_sample, v_sample_yup, pixels, anaW, anaH, gammaVal);
+
+                    // Calculate Variable Width and Speed
+                    const targetW = minW + darkness * (maxW - minW);
+                    const targetF = maxSpeed - darkness * (maxSpeed - minSpeed);
+
+                    if (isConnect || !useSquiggle || darkness < 0.1) {
+                        writeMove(x, y, targetW, targetF, isConnect);
+                    } else {
+                        // Squiggle Generation
+                        const startX = prevX;
+                        const startY = prevY;
+                        const distTotal = Math.hypot(x - startX, y - startY);
+                        const numSegments = Math.max(2, Math.floor(distTotal / 0.1));
+
+                        const dx = (x - startX) / numSegments;
+                        const dy = (y - startY) / numSegments;
+
+                        const norm = Math.hypot(dx, dy);
+                        let dx_perp = -dy / norm;
+                        let dy_perp = dx / norm;
+
+                        const amplitude = squiggleAmp * darkness;
+                        const freq = squiggleFreq * TWO_PI; // Use global constant for 2*PI
+
+                        for (let i = 1; i <= numSegments; i++) {
+                            const currentDist = (i / numSegments) * distTotal;
+
+                            let px_straight = startX + dx * i;
+                            let py_straight = startY + dy * i;
+
+                            const phase = currentDist * freq;
+                            const offsetMag = Math.sin(phase) * amplitude;
+
+                            const px_squiggle = px_straight + dx_perp * offsetMag;
+                            const py_squiggle = py_straight + dy_perp * offsetMag;
+
+                            writeMove(px_squiggle, py_squiggle, targetW, targetF);
+                        }
+                    }
+                }
+
+                // --- 5. PATH GENERATION (Simplified Logic) ---
+
+                if (pathType === "hilbert") {
+                    const order = fractalOrder;
+                    const N = 1 << order;
+                    const totalPoints = N * N;
+                    const step = printDim / N;
+
+                    for (let d = 1; d < totalPoints; d++) {
+                        let p = hilbert(order, d);
+                        doSmartMove(centerOffset.x + p.x * step, centerOffset.y + p.y * step);
+                    }
+                } else if (pathType === "squareSpiral") {
+                    let currentSize = printDim;
+                    let currentOffset = { x: centerOffset.x, y: centerOffset.y };
+                    const res = 0.5;
+
+                    while (currentSize > spacing * 1.5) {
+                        let x0 = currentOffset.x;
+                        let y0 = currentOffset.y;
+                        let x1 = currentOffset.x + currentSize;
+                        let y1 = currentOffset.y + currentSize;
+
+                        // Move function for a line segment
+                        const moveLine = (startX, startY, endX, endY, length) => {
+                            const numSegs = Math.max(2, Math.floor(length / res));
+                            for (let k = 1; k <= numSegs; k++) {
+                                let t = k / numSegs;
+                                doSmartMove(startX + (endX - startX) * t, startY + (endY - startY) * t);
+                            }
+                        };
+
+                        // 1. Bottom (X0 -> X1)
+                        moveLine(x0, y0, x1, y0, currentSize);
+
+                        // 2. Right (Y0 -> Y1)
+                        moveLine(x1, y0, x1, y1, currentSize);
+
+                        // 3. Top (X1 -> X0)
+                        moveLine(x1, y1, x0, y1, currentSize);
+
+                        // 4. Left (Y1 -> Y0 + spacing)
+                        let remainingLength = currentSize - spacing;
+                        moveLine(x0, y1, x0, y1 - remainingLength, remainingLength);
+
+                        // Connect to the next layer
+                        let nextX = currentOffset.x + spacing;
+                        let nextY = currentOffset.y + spacing;
+                        doSmartMove(nextX, nextY, true);
+
+                        // Update for the next iteration
+                        currentSize -= spacing * 2;
+                        currentOffset.x += spacing;
+                        currentOffset.y += spacing;
+                    }
+
+                    // Last point: center
+                    if (currentSize > 0) {
+                        doSmartMove(currentOffset.x + currentSize / 2, currentOffset.y + currentSize / 2);
+                    }
+                } else if (pathType === "diagonal") {
+                    const axisStep = spacing * Math.sqrt(2);
+                    const maxSum = printWidth + printHeight;
+                    const numDiagonals = Math.floor(maxSum / axisStep);
+
+                    for (let i = 0; i <= numDiagonals; i++) {
+                        let sum = i * axisStep;
+
+                        // Calculate line segment start (p1) and end (p2) points within the print area (0,0) to (W,H)
+                        let p1x = sum <= printHeight ? 0 : sum - printHeight;
+                        let p1y = sum <= printHeight ? sum : printHeight;
+                        let p2x = sum <= printWidth ? sum : printWidth;
+                        let p2y = sum <= printWidth ? 0 : sum - printWidth;
+
+                        let startX, startY, endX, endY;
+                        if (i % 2 === 0) {
+                            startX = p1x;
+                            startY = p1y;
+                            endX = p2x;
+                            endY = p2y;
+                        } else {
+                            startX = p2x;
+                            startY = p2y;
+                            endX = p1x;
+                            endY = p1y;
+                        }
+
+                        // Clamp to be perfectly within bounds
+                        startX = Math.max(0, Math.min(printWidth, startX));
+                        startY = Math.max(0, Math.min(printHeight, startY));
+                        endX = Math.max(0, Math.min(printWidth, endX));
+                        endY = Math.max(0, Math.min(printHeight, endY));
+
+                        if (i > 0) {
+                            doSmartMove(offsetX + startX, offsetY + startY, true);
+                        }
+
+                        const distLine = Math.hypot(endX - startX, endY - startY);
+
+                        if (distLine > 0.01) {
+                            const numSegs = Math.max(2, Math.floor(distLine / 0.5));
+
+                            for (let k = 1; k <= numSegs; k++) {
+                                let t = k / numSegs;
+                                doSmartMove(
+                                    offsetX + startX + (endX - startX) * t,
+                                    offsetY + startY + (endY - startY) * t
+                                );
+                            }
+                        }
+                    }
+                } else if (pathType === "spiral") {
+                    let cx = offsetX + printWidth / 2;
+                    let cy = offsetY + printHeight / 2;
+                    let radius = 0.0;
+                    let angle = 0;
+                    const maxRadius = printDim / 2;
+
+                    while (radius < maxRadius) {
+                        let res = 0.5;
+                        let dTheta = res / Math.max(0.5, radius);
+                        angle += dTheta;
+                        radius = (spacing / TWO_PI) * angle;
+
+                        // Stop if outside the print area (only if radius calculation leads there)
+                        if (radius > maxRadius) break;
+
+                        let px = cx + radius * Math.cos(angle);
+                        let py = cy + radius * Math.sin(angle);
+                        doSmartMove(px, py);
+                    }
+                } else {
+                    // ZigZag Continuous (Default)
+                    const lines = Math.floor(printHeight / spacing);
+
+                    for (let i = 0; i < lines; i++) {
+                        let y = i * spacing;
+                        let even = i % 2 === 0;
+                        let xStart = even ? 0 : printWidth;
+                        let xEnd = even ? printWidth : 0;
+
+                        // Connect (Vertical Edge)
+                        if (i > 0) {
+                            doSmartMove(offsetX + xStart, offsetY + y, true);
+                        }
+
+                        // Print Line (Horizontal)
+                        const distLine = printWidth;
+                        const numSegs = Math.max(2, Math.floor(distLine / 0.5));
+                        for (let k = 1; k <= numSegs; k++) {
+                            let t = k / numSegs;
+                            let currX = xStart + (xEnd - xStart) * t;
+                            doSmartMove(offsetX + currX, offsetY + y);
+                        }
+                    }
+                }
+
+                // --- 6. G-Code Footer ---
+                gcode.push(`G0 Z${safeZ.toFixed(3)} F3000 ; Lift to safe Z`);
+                gcode.push(`; Total Extruded: E${totalE.toFixed(2)}`);
+                gcode.push(`; --- End of Central G-Code Block ---`);
+                gcodeContent = gcode.join("\n");
+
+                // Update UI
+                document.getElementById("downloadBtn").style.display = "inline-block";
+                document.getElementById("stats").style.display = "block";
+                document.getElementById("stats").innerHTML = `
+            <strong>Result:</strong><br>
+            Print Dimensions: ${printWidth.toFixed(2)}x${printHeight.toFixed(2)}mm<br>
+            Estimated Filament: ${(totalE / 1000).toFixed(2)}m<br>
+            Speed: ${minSpeedMMS} - ${maxSpeedMMS} mm/s
+        `;
+            }
+
+            function downloadGcode() {
+                const blob = new Blob([gcodeContent], { type: "text/plain" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "art_path_insert_v6_3_zoomed.gcode";
+                a.click();
+                window.URL.revokeObjectURL(url);
+            }
+
+            // Initialize the event handlers once the script is loaded
+            document.addEventListener("DOMContentLoaded", () => {
+                setupImageManipulationHandlers();
+
+                // Update preview when mirror checkbox changes
+                document.getElementById("mirrorimage").addEventListener("change", () => {
+                    if (originalImage) {
+                        const bedSize = parseFloat(document.getElementById("bedSize").value) || 250;
+                        const printWidth = parseFloat(printWidthInput.value) || 100;
+                        const printHeight = parseFloat(printHeightInput.value) || 100;
+                        const offsetX = (bedSize - printWidth) / 2;
+                        const offsetY = (bedSize - printHeight) / 2;
+                        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+                    }
+                });
+
+                // Update preview when the hide image overlay checkbox changes
+                document.getElementById("hideImageOverlay").addEventListener("change", () => {
+                    if (originalImage) {
+                        const bedSize = parseFloat(document.getElementById("bedSize").value) || 250;
+                        const printWidth = parseFloat(printWidthInput.value) || 100;
+                        const printHeight = parseFloat(printHeightInput.value) || 100;
+                        const offsetX = (bedSize - printWidth) / 2;
+                        const offsetY = (bedSize - printHeight) / 2;
+                        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+                    }
+                });
+            });
+        </script>
+    </body>
+</html>
