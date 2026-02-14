@@ -1171,7 +1171,7 @@ function downloadGcode() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "art_anycubic_merged.gcode";
+    a.download = "art_gcode.gcode";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1179,26 +1179,73 @@ function downloadGcode() {
 }
 
 function mergeWithTemplate(artGcode) {
-    if (!gcodeTemplateContent) return artGcode;
+    if (!gcodeTemplateContent) {
+        alert("Errore: Carica prima il file base.gcode!");
+        return artGcode;
+    }
+
     const lines = gcodeTemplateContent.split(/\r?\n/);
-    let injectIndex = -1;
+    let startIndex = -1;
+    let endIndex = -1;
+
+    // SCANSIONE: Cerca SOLO i nuovi marker definitivi
     for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim().toUpperCase() === ";MARKER") {
-            injectIndex = i;
-            break;
+        const line = lines[i].toUpperCase();
+        
+        // Cerca start anche se ci sono altri caratteri nella riga
+        if (line.includes(";START_ART")) {
+            startIndex = i;
+        }
+        // Cerca end anche se ci sono altri caratteri nella riga
+        if (line.includes(";END_ART")) {
+            endIndex = i;
         }
     }
-    if (injectIndex !== -1) {
-        return [
-            lines.slice(0, injectIndex + 1).join("\n"),
-            "\n; --- STARTING ARTWORK DRAWING ---",
-            artGcode,
-            "; --- ENDING ARTWORK DRAWING ---\n",
-            lines.slice(injectIndex + 1).join("\n")
-        ].join("\n");
+
+    // Se manca lo START, blocchiamo tutto
+    if (startIndex === -1) {
+        alert("ERRORE: Marker ;START_ART non trovato nel template.");
+        return gcodeTemplateContent + "\n" + artGcode;
     }
-    alert("Attention: ;MARKER don't found.");
-    return gcodeTemplateContent + "\n" + artGcode;
+
+    // HEADER: Tutto fino allo START compreso
+    const header = lines.slice(0, startIndex + 1).join('\n');
+    
+    // FOOTER: Tutto dall'END compreso in poi (se esiste)
+    let footer = "";
+    if (endIndex !== -1 && endIndex > startIndex) {
+        footer = lines.slice(endIndex).join('\n');
+    } else {
+        // Fallback solo se ti sei dimenticato di scrivere END_ART
+        footer = lines.slice(startIndex + 1).join('\n');
+    }
+
+    // RECUPERO VARIABILI UI
+    const mode = document.getElementById("filamentChangeMode")?.value || "manual";
+    const amsBaseSlot = document.getElementById("amsBaseSlot")?.value || "T0";
+    const amsDrawingSlot = document.getElementById("amsDrawingSlot")?.value || "T1";
+
+    // GENERAZIONE COMANDO CAMBIO
+    let changeCommand = "";
+    if (mode === "ams") {
+        changeCommand = `\n; --- CAMBIO AUTOMATICO ACE/AMS ---\n${amsDrawingSlot}\n`;
+    } else {
+        changeCommand = "\n; --- PAUSA MANUALE ---\nM600\n";
+    }
+
+    // COSTRUZIONE FINALE
+    let finalGcode = header + 
+                     changeCommand + 
+                     "\n; --- START ARTWORK ---\n" + 
+                     artGcode + 
+                     "\n; --- END ARTWORK ---\n";
+
+    // RITORNO AL COLORE BASE (Solo per AMS)
+    if (mode === "ams") {
+        finalGcode += `\n${amsBaseSlot}\n; --- RIPRISTINO BASE ---\n`;
+    }
+
+    return finalGcode + footer;
 }
 
 // --- INITIALIZATION ---
@@ -1215,4 +1262,5 @@ document.addEventListener("DOMContentLoaded", () => {
             if (display) display.innerText = e.target.value;
         });
     });
+
 });
