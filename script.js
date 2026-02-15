@@ -473,6 +473,7 @@ function processImage() {
             const z = zOffset + layer * layerHeight;
             gcode.push(`G1 Z${z.toFixed(3)} F1000 ; Base layer ${layer + 1}/${baseLayers}`);
 
+            // 1. Disegno dei muri (Walls)
             for (let w = 0; w < numWalls; w++) {
                 const currentWallRadius = baseRadius - w * wallSpacing;
                 const numPoints = Math.max(60, Math.ceil((TWO_PI * currentWallRadius) / 0.5));
@@ -481,8 +482,7 @@ function processImage() {
                 const startY = centerY;
 
                 gcode.push(`G0 X${startX.toFixed(3)} Y${startY.toFixed(3)} F6000`);
-                prevX = startX;
-                prevY = startY;
+                prevX = startX; prevY = startY;
 
                 for (let i = 1; i <= numPoints; i++) {
                     const angle = i * dAngle;
@@ -492,26 +492,45 @@ function processImage() {
                 }
             }
 
+            // --- NOVITÀ: OTTIMIZZAZIONE TRANSIZIONE MURI -> INFILL ---
+            gcode.push(`G1 E-0.8 F3000 ; Retrazione anti-blob`);
+            gcode.push(`G0 Z${(z + 0.4).toFixed(3)} F6000 ; Z-Hop di sicurezza`);
+
             let goingRight = true;
-            const fillLimitRadius = baseRadius - numWalls * wallSpacing + 0.1;
+            // Ridotto l'overlap da +0.1 a -0.05 per non "pestare" i muri
+            const fillLimitRadius = baseRadius - (numWalls * wallSpacing) - 0.05; 
+            const infillTotalHeight = fillLimitRadius * 2;
+
             for (let yRel = -fillLimitRadius; yRel <= fillLimitRadius; yRel += baseOverlap) {
                 const xLimit = Math.sqrt(Math.max(0, Math.pow(fillLimitRadius, 2) - Math.pow(yRel, 2)));
                 const xLeft = centerX - xLimit;
                 const xRight = centerX + xLimit;
                 const currentY = centerY + yRel;
+
+                // --- NOVITÀ: VELOCITÀ RIDOTTA NEL PRIMO 10% ---
+                let currentSpeed = baseSpeed;
+                if (yRel < (-fillLimitRadius + (infillTotalHeight * 0.10))) {
+                    currentSpeed = baseSpeed * 0.5; // Vai al 50% della velocità
+                }
+
                 if (goingRight) {
                     if (yRel === -fillLimitRadius || Math.abs(yRel + fillLimitRadius) < 0.01) {
                         gcode.push(`G0 X${xLeft.toFixed(3)} Y${currentY.toFixed(3)} F6000`);
+                        gcode.push(`G1 Z${z.toFixed(3)} F1000 ; Torna in quota`);
+                        gcode.push(`G1 E0.8 F3000 ; Prime (ripristino filo)`);
+                        prevX = xLeft; prevY = currentY;
                     } else {
-                        writeBaseSegment(xLeft, currentY);
+                        writeBaseSegment(xLeft, currentY, currentSpeed);
                     }
-                    writeBaseSegment(xRight, currentY);
+                    writeBaseSegment(xRight, currentY, currentSpeed);
                 } else {
-                    writeBaseSegment(xRight, currentY);
-                    writeBaseSegment(xLeft, currentY);
+                    writeBaseSegment(xRight, currentY, currentSpeed);
+                    writeBaseSegment(xLeft, currentY, currentSpeed);
                 }
                 goingRight = !goingRight;
             }
+            // Fine layer: un piccolo salto prima di salire al prossimo
+            gcode.push(`G0 Z${(z + 0.5).toFixed(3)} F6000`);
         }
 
         // --- 2. TRANSIZIONE AL DISEGNO ---
@@ -841,7 +860,7 @@ function processImage() {
             Speed: ${minSpeedMMS} - ${maxSpeedMMS} mm/s
         `;
     }
-} // <--- CHIUSURA CORRETTA DELLA FUNZIONE processImage
+}
 
 // --- 3D PREVIEW ENGINE (three.js) ---
 function init3DPreview() {
