@@ -439,12 +439,13 @@ function processImage() {
 
     let drawingStartZ = zOffset;
 
-    function writeBaseSegment(x, y) {
+function writeBaseSegment(x, y, customSpeed = baseSpeed) {
         const dist = Math.hypot(x - prevX, y - prevY);
         if (dist < 0.01) return;
         const vol = dist * BASE_LINE_WIDTH * layerHeight;
         const e = vol / filArea;
-        gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(5)} F${baseSpeed.toFixed(0)}`);
+        // Usa customSpeed invece della velocità fissa
+        gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(5)} F${customSpeed.toFixed(0)}`);
         totalE += e;
         prevX = x;
         prevY = y;
@@ -534,6 +535,7 @@ function processImage() {
         }
 
         // --- 2. TRANSIZIONE AL DISEGNO ---
+        // --- 2. TRANSIZIONE AL DISEGNO (OTTIMIZZATA) ---
         gcode.push(`; --- TRANSITION TO ARTWORK ---`);
 
         if (changeMode === "ams") {
@@ -541,28 +543,35 @@ function processImage() {
             gcode.push(`G91 ; Relative`);
             gcode.push(`G1 Z5 F3000 ; Lift for toolchange`);
             gcode.push(`G90 ; Absolute`);
-
-            // Usiamo il secondo slot scelto dall'utente
-            gcode.push(`${amsDrawingSlot} ; Switch to Drawing Filament Slot`);
-
+            gcode.push(`${amsDrawingSlot} ; Switch to Drawing Filament`);
             gcode.push(`M400 ; Wait for AMS`);
-            gcode.push(`G92 E0 ; Reset extruder`);
         } else {
             gcode.push(`G91 ; Relative`);
             gcode.push(`G1 E-5 F3000 ; Retract`);
             gcode.push(`G1 Z10 F1000 ; Safety lift`);
             gcode.push(`G90 ; Absolute`);
-            gcode.push(`G0 X0 Y0 F6000 ; Park`);
+            gcode.push(`G0 X0 Y0 F6000 ; Park for manual change`);
             gcode.push(`M600 ; Manual Pause`);
         }
 
         drawingStartZ = zOffset + baseLayers * layerHeight;
         gcode.push(`; --- STARTING ARTWORK DRAWING ---`);
-        gcode.push(`G0 Z${(drawingStartZ + 5).toFixed(3)} F3000`);
-        gcode.push(`G0 X${startPoint.x.toFixed(3)} Y${startPoint.y.toFixed(3)} F6000`);
+        
+        // 1. Spostamento rapido sopra il punto di inizio
+        gcode.push(`G0 X${startPoint.x.toFixed(3)} Y${startPoint.y.toFixed(3)} Z${(drawingStartZ + 2).toFixed(3)} F6000`);
+        
+        // 2. Discesa lenta in quota stampa
         gcode.push(`G1 Z${drawingStartZ.toFixed(3)} F1000`);
+        
+        // 3. PRIMING: Estrude una piccolissima quantità stando fermi per riempire l'ugello
+        gcode.push(`G1 E0.5 F600 ; Prime nozzle prima di partire`);
+        gcode.push(`G4 P200 ; Pausa di 0.2 secondi per stabilizzare`);
+        
+        // 4. Inizio effettivo con velocità ridotta per i primi millimetri
+        // Reset posizione precedente
         prevX = startPoint.x;
         prevY = startPoint.y;
+        gcode.push(`G92 E0 ; Reset estrusi`);
     } else {
         // --- 3. LOGICA SENZA BASE (SELEZIONE SLOT DISEGNO) ---
         if (changeMode === "ams") {
