@@ -32,327 +32,510 @@
             };
         </script>
         <link rel="stylesheet" href="https://carlobalde-lang.github.io/gcode-art-generator/styles.css" />
+        <style>
+            /* Accordion Styles */
+            .accordion-section {
+                margin-bottom: 1rem;
+                border-radius: 0.75rem;
+                overflow: hidden;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            }
+            
+            .accordion-header {
+                padding: 1rem 1.25rem;
+                background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+                cursor: pointer;
+                user-select: none;
+                transition: background 0.2s ease;
+                border-bottom: 2px solid transparent;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            
+            .accordion-header:hover {
+                background: linear-gradient(90deg, #e0f2fe 0%, #dbeafe 100%);
+            }
+            
+            .accordion-header.active {
+                background: linear-gradient(90deg, #dbeafe 0%, #bfdbfe 100%);
+                border-bottom-color: #93c5fd;
+            }
+            
+            .accordion-header-content {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                flex: 1;
+            }
+            
+            .accordion-icon {
+                transition: transform 0.3s ease;
+                color: #64748b;
+                flex-shrink: 0;
+            }
+            
+            .accordion-header.active .accordion-icon {
+                transform: rotate(180deg);
+                color: #2563eb;
+            }
+            
+            .accordion-content {
+                display: none;
+                padding: 1.25rem;
+                background: white;
+                animation: slideDown 0.3s ease;
+            }
+            
+            @keyframes slideDown {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .accordion-badge {
+                display: inline-block;
+                padding: 0.25rem 0.625rem;
+                border-radius: 9999px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                color: white;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            }
+            
+            .badge-step {
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            }
+            
+            .badge-optional {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            }
+            
+            .badge-advanced {
+                background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            }
+            
+            /* Sticky Header */
+            .sticky-header {
+                position: sticky;
+                top: 0;
+                z-index: 50;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(10px);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                border-bottom: 1px solid #e5e7eb;
+            }
+        </style>
     </head>
     <body class="bg-gradient-page text-blue-muted p-5 font-sans antialiased min-h-screen">
-        <h1 class="col-span-full text-center text-2xl font-bold mb-2 bg-gradient-heading bg-clip-text text-transparent">
-            🌀 G-Code Art Generator
-        </h1>
+        <!-- Sticky Header -->
+        <div class="sticky-header">
+            <div class="max-w-6xl mx-auto px-4 py-3">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+                    <h1 class="text-2xl font-bold bg-gradient-heading bg-clip-text text-transparent">
+                        🌀 G-Code Art Generator
+                    </h1>
+                    <div class="flex gap-3 w-full md:w-auto">
+                        <button
+                            id="generateBtn"
+                            type="button"
+                            class="flex-1 md:flex-none rounded-lg bg-gradient-btn hover:bg-gradient-btn-hover text-white font-semibold py-2.5 px-6 shadow-md transition focus:outline-none focus:ring-2 focus:ring-primary">
+                            🚀 Generate Preview
+                        </button>
+                        <button
+                            type="button"
+                            id="downloadBtn"
+                            class="hidden flex-1 md:flex-none rounded-lg bg-gradient-btn-secondary hover:opacity-90 text-white font-medium py-2.5 px-6 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-400">
+                            📥 Download
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6">
-            <!-- Notice banner (blue variation) -->
+        <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6 mt-6">
+            <!-- Notice banner -->
             <div
                 class="col-span-full rounded-r-lg border-l-4 border-blue-500 bg-gradient-notice text-blue-900 px-4 py-3 text-sm shadow-sm">
                 ⚠️ <strong>ATTENTION:</strong> Use this code at your own risk!
             </div>
 
             <!-- Left panel: controls -->
-            <div class="bg-gradient-panel rounded-xl shadow-lg p-6 space-y-5 border border-blue-100/60">
-                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2">1. Image upload</h3>
-                <input
-                    type="file"
-                    id="imageInput"
-                    accept="image/*"
-                    class="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-100 file:text-blue-800 file:font-medium hover:file:bg-blue-200 file:cursor-pointer file:transition" />
-
-                <div
-                    class="flex items-center gap-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 p-3 border border-blue-200/80">
-                    <input
-                        type="checkbox"
-                        id="mirrorimage"
-                        class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
-                    <label for="mirrorimage" class="text-sm font-medium text-blue-900 cursor-pointer select-none"
-                        >Mirror image</label
-                    >
-                </div>
-                <div
-                    class="flex items-center gap-3 rounded-lg bg-gradient-to-r from-sky-50 to-blue-50 p-3 border border-sky-200/80">
-                    <input
-                        type="checkbox"
-                        id="hideImageOverlay"
-                        checked
-                        class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
-                    <label for="hideImageOverlay" class="text-sm font-medium text-blue-900 cursor-pointer select-none"
-                        >Show Image Preview Overlay</label
-                    >
-                </div>
-
-                <div class="control-group rounded-lg bg-gradient-accent p-4 border border-indigo-200/80">
-                    <label class="block text-sm font-semibold text-blue-900 mb-2">📍 Path Type</label>
-                    <select
-                        id="pathType"
-                        class="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 transition">
-                        <option value="spiral">Spiral</option>
-                        <option value="zigzag">Zig-Zag (Horizontal)</option>
-                        <option value="squareSpiral">Square Spiral</option>
-                        <option value="hilbert">Hilbert Curve (Fractal)</option>
-                        <option value="diagonal">Diagonals</option>
-                    </select>
-                </div>
-                <div
-                    class="control-group rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border border-blue-200/80">
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="text-sm font-semibold text-blue-900">📉 Hilbert Density</label>
-                        <span
-                            id="orderVal"
-                            class="text-sm font-mono bg-white/90 px-2 py-0.5 rounded border border-blue-200 text-blue-800"
-                            >6</span
-                        >
+            <div class="space-y-4">
+                <!-- SECTION 1: Image Upload -->
+                <div class="accordion-section bg-gradient-panel">
+                    <div class="accordion-header active" data-section="section1">
+                        <div class="accordion-header-content">
+                            <span class="text-2xl">📸</span>
+                            <span class="font-semibold text-blue-900">1. Image Upload</span>
+                            <span class="accordion-badge badge-step">Step 1</span>
+                        </div>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
                     </div>
-                    <input
-                        type="range"
-                        id="hilbertOrder"
-                        min="3"
-                        max="8"
-                        step="1"
-                        value="6"
-                        class="w-full h-2 rounded-lg appearance-none bg-blue-100 accent-primary cursor-pointer"
-                        title="Hilbert curve order" />
-                </div>
-
-                <div
-                    class="control-group rounded-lg bg-gradient-to-r from-blue-100 to-sky-100 p-4 border border-blue-300 border-l-4 border-l-blue-500">
-                    <label class="block text-sm font-semibold text-blue-900 mb-2">📐 Bed Size (mm)</label>
-                    <input
-                        type="number"
-                        id="bedSize"
-                        value="250"
-                        title="Total X/Y bed dimensions"
-                        class="input-elegant" />
-                </div>
-
-                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">
-                    2. Print Parameters
-                </h3>
-                <div class="control-group">
-                    <label class="block text-sm font-medium text-blue-900 mb-1">Filament Diameter (mm)</label>
-                    <input type="number" id="filamentDia" value="1.75" step="0.01" class="input-elegant" />
-                </div>
-                <div class="control-group">
-                    <label class="block text-sm font-medium text-blue-900 mb-1">Layer Height (mm)</label>
-                    <input type="number" id="layerHeight" value="0.2" step="0.01" class="input-elegant" />
-                </div>
-                <div class="control-group">
-                    <label class="block text-sm font-medium text-blue-900 mb-1">Z-Offset / Start Z (mm)</label>
-                    <input type="number" id="zOffset" value="0.2" step="0.01" class="input-elegant" />
-                </div>
-
-                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">
-                    3. Lines & Effects
-                </h3>
-                <div class="control-group">
-                    <label class="block text-sm font-medium text-blue-900 mb-1"
-                        >📐 Print Dimensions (mm) – Proportional</label
-                    >
-                    <div class="flex gap-3">
+                    <div class="accordion-content" style="display: block;">
                         <input
-                            type="number"
-                            id="printWidth"
-                            value="180"
-                            step="1"
-                            title="Final print Width (X)"
-                            class="input-elegant flex-1" />
-                        <input
-                            type="number"
-                            id="printHeight"
-                            value="180"
-                            step="1"
-                            title="Final print Height (Y)"
-                            class="input-elegant flex-1" />
-                    </div>
-                    <p id="imageRatioInfo" class="text-xs text-blue-600 mt-2">Image Ratio: Upload an image</p>
-                </div>
-                <div class="control-group">
-                    <label class="block text-sm font-medium text-blue-900 mb-1">Line Spacing (mm)</label>
-                    <input type="number" id="lineSpacing" value="1.0" step="0.1" class="input-elegant" />
-                </div>
-                <div class="control-group">
-                    <label class="block text-sm font-medium text-blue-900 mb-1">MIN Line Width (Light)</label>
-                    <input type="number" id="minLineWidth" value="0.2" step="0.1" class="input-elegant" />
-                </div>
-                <div class="control-group">
-                    <label class="block text-sm font-medium text-blue-900 mb-1">MAX Line Width (Dark)</label>
-                    <input type="number" id="maxLineWidth" value="0.8" step="0.1" class="input-elegant" />
-                </div>
+                            type="file"
+                            id="imageInput"
+                            accept="image/*"
+                            class="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-100 file:text-blue-800 file:font-medium hover:file:bg-blue-200 file:cursor-pointer file:transition mb-4" />
 
-                <div class="control-group rounded-lg bg-gradient-to-r from-sky-50 to-blue-50 p-4 border border-sky-200">
-                    <label class="block text-sm font-semibold text-blue-900 mb-2">⚡ Min/Max Speed (mm/s)</label>
-                    <div class="flex gap-3">
-                        <input
-                            type="number"
-                            id="minSpeed"
-                            value="10"
-                            step="0.1"
-                            title="Speed for black (Slow/Glossy)"
-                            class="input-elegant flex-1" />
-                        <input
-                            type="number"
-                            id="maxSpeed"
-                            value="100"
-                            step="0.1"
-                            title="Speed for white (Fast/Matte)"
-                            class="input-elegant flex-1" />
-                    </div>
-                </div>
-                <div class="control-group">
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="text-sm font-medium text-blue-900">🌗 Gamma Correction (1.0 = Neutral)</label>
-                        <span
-                            id="gammaVal"
-                            class="text-sm font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-blue-800"
-                            >1.5</span
-                        >
-                    </div>
-                    <input
-                        type="range"
-                        id="gamma"
-                        min="0.5"
-                        max="3.0"
-                        step="0.1"
-                        value="1.5"
-                        class="w-full h-2 rounded-lg appearance-none bg-blue-100 accent-primary cursor-pointer" />
-                </div>
-
-                <div
-                    class="control-group rounded-lg bg-gradient-to-r from-indigo-50 to-blue-50 p-4 border border-indigo-200/80">
-                    <label class="block text-sm font-semibold text-blue-900 mb-2"
-                        >〰️ Max Squiggle Amplitude (mm, 0 disables)</label
-                    >
-                    <input
-                        type="number"
-                        id="squiggleAmp"
-                        value="0.3"
-                        step="0.1"
-                        title="Maximum wobble amplitude for deep black"
-                        class="input-elegant mb-3" />
-                    <label class="block text-sm font-medium text-blue-900 mb-1"
-                        >Squiggle Frequency (cycles per mm)</label
-                    >
-                    <input
-                        type="number"
-                        id="squiggleFreq"
-                        value="1"
-                        step="0.1"
-                        title="How many wobble cycles per mm of travel"
-                        class="input-elegant" />
-                </div>
-
-                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">
-                    4. Base (optional)
-                </h3>
-                <div
-                    class="control-group rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 p-4 border border-blue-200/80">
-                    <div class="flex items-center gap-3 mb-4">
-                        <input
-                            type="checkbox"
-                            id="addCircularBase"
-                            class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
-                        <label
-                            for="addCircularBase"
-                            class="text-sm font-medium text-blue-900 cursor-pointer select-none"
-                            >Add base (foundation for the artwork)</label
-                        >
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="control-group">
-                            <label class="block text-sm font-medium text-blue-900 mb-1">Base margin (mm)</label>
+                        <div
+                            class="flex items-center gap-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 p-3 border border-blue-200/80 mb-3">
                             <input
-                                type="number"
-                                id="baseMargin"
-                                value="2"
-                                min="0"
-                                step="0.5"
-                                title="Margin between base edge and image"
-                                class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2" />
+                                type="checkbox"
+                                id="mirrorimage"
+                                class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
+                            <label for="mirrorimage" class="text-sm font-medium text-blue-900 cursor-pointer select-none"
+                                >Mirror image</label
+                            >
+                        </div>
+                        <div
+                            class="flex items-center gap-3 rounded-lg bg-gradient-to-r from-sky-50 to-blue-50 p-3 border border-sky-200/80 mb-4">
+                            <input
+                                type="checkbox"
+                                id="hideImageOverlay"
+                                checked
+                                class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
+                            <label for="hideImageOverlay" class="text-sm font-medium text-blue-900 cursor-pointer select-none"
+                                >Show Image Preview Overlay</label
+                            >
                         </div>
 
-                        <div class="control-group">
-                            <label class="block text-sm font-medium text-blue-900 mb-1">Base layers (height)</label>
+                        <div class="control-group rounded-lg bg-gradient-accent p-4 border border-indigo-200/80 mb-4">
+                            <label class="block text-sm font-semibold text-blue-900 mb-2">📍 Path Type</label>
+                            <select
+                                id="pathType"
+                                class="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 transition">
+                                <option value="spiral">Spiral</option>
+                                <option value="zigzag">Zig-Zag (Horizontal)</option>
+                                <option value="squareSpiral">Square Spiral</option>
+                                <option value="hilbert">Hilbert Curve (Fractal)</option>
+                                <option value="diagonal">Diagonals</option>
+                            </select>
+                        </div>
+                        
+                        <div
+                            id="hilbertSection"
+                            class="control-group rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border border-blue-200/80 mb-4"
+                            style="display: none;">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-sm font-semibold text-blue-900">📉 Hilbert Density</label>
+                                <span
+                                    id="orderVal"
+                                    class="text-sm font-mono bg-white/90 px-2 py-0.5 rounded border border-blue-200 text-blue-800"
+                                    >6</span
+                                >
+                            </div>
                             <input
-                                type="number"
-                                id="baseLayers"
-                                value="2"
-                                min="1"
+                                type="range"
+                                id="hilbertOrder"
+                                min="3"
+                                max="8"
                                 step="1"
-                                title="Number of layers for the base"
-                                class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2" />
+                                value="6"
+                                class="w-full h-2 rounded-lg appearance-none bg-blue-100 accent-primary cursor-pointer"
+                                title="Hilbert curve order" />
                         </div>
 
+                        <div
+                            class="control-group rounded-lg bg-gradient-to-r from-blue-100 to-sky-100 p-4 border border-blue-300 border-l-4 border-l-blue-500">
+                            <label class="block text-sm font-semibold text-blue-900 mb-2">📐 Bed Size (mm)</label>
+                            <input
+                                type="number"
+                                id="bedSize"
+                                value="250"
+                                title="Total X/Y bed dimensions"
+                                class="input-elegant" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: Print Parameters -->
+                <div class="accordion-section bg-gradient-panel">
+                    <div class="accordion-header" data-section="section2">
+                        <div class="accordion-header-content">
+                            <span class="text-2xl">🔧</span>
+                            <span class="font-semibold text-blue-900">2. Print Parameters</span>
+                            <span class="accordion-badge badge-optional">Optional</span>
+                        </div>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="control-group mb-4">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">Filament Diameter (mm)</label>
+                            <input type="number" id="filamentDia" value="1.75" step="0.01" class="input-elegant" />
+                        </div>
+                        <div class="control-group mb-4">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">Layer Height (mm)</label>
+                            <input type="number" id="layerHeight" value="0.2" step="0.01" class="input-elegant" />
+                        </div>
                         <div class="control-group">
-                            <label class="block text-sm font-medium text-blue-900 mb-1">
-                                Base Speed:
-                                <span id="baseSpeedVal">100</span> mm/s
-                            </label>
-                            <input type="range" id="baseSpeed" min="10" max="150" step="1" value="30" />
+                            <label class="block text-sm font-medium text-blue-900 mb-1">Z-Offset / Start Z (mm)</label>
+                            <input type="number" id="zOffset" value="0.2" step="0.01" class="input-elegant" />
                         </div>
                     </div>
+                </div>
 
-                    <div class="border-t border-blue-200/60 my-4"></div>
-
-                    <div class="control-group">
-                        <label class="block text-sm font-medium text-blue-900 mb-1">Filament Change Method</label>
-                        <select
-                            id="filamentChangeMode"
-                            class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm">
-                            <option value="manual">Manual Pause</option>
-                            <option value="ams">Automatic (AMS)</option>
-                        </select>
+                <!-- SECTION 3: Lines & Effects -->
+                <div class="accordion-section bg-gradient-panel">
+                    <div class="accordion-header" data-section="section3">
+                        <div class="accordion-header-content">
+                            <span class="text-2xl">✨</span>
+                            <span class="font-semibold text-blue-900">3. Lines & Effects</span>
+                            <span class="accordion-badge badge-advanced">Advanced</span>
+                        </div>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
                     </div>
-                    <div
-                        id="amsSlotContainer"
-                        class="control-group mt-3 hidden bg-blue-100/50 p-3 rounded-md border border-blue-200">
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Base Slot</label>
-                                <select id="amsBaseSlot" class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
-                                    <option value="T0" selected>Slot 1</option>
-                                    <option value="T1">Slot 2</option>
-                                    <option value="T2">Slot 3</option>
-                                    <option value="T3">Slot 4</option>
-                                </select>
+                    <div class="accordion-content">
+                        <div class="control-group mb-4">
+                            <label class="block text-sm font-medium text-blue-900 mb-1"
+                                >📐 Print Dimensions (mm) – Proportional</label
+                            >
+                            <div class="flex gap-3">
+                                <input
+                                    type="number"
+                                    id="printWidth"
+                                    value="180"
+                                    step="1"
+                                    title="Final print Width (X)"
+                                    class="input-elegant flex-1" />
+                                <input
+                                    type="number"
+                                    id="printHeight"
+                                    value="180"
+                                    step="1"
+                                    title="Final print Height (Y)"
+                                    class="input-elegant flex-1" />
                             </div>
-                            <div>
-                                <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Drawing Slot</label>
-                                <select id="amsDrawingSlot" class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
-                                    <option value="T0">Slot 1</option>
-                                    <option value="T1" selected>Slot 2</option>
-                                    <option value="T2">Slot 3</option>
-                                    <option value="T3">Slot 4</option>
-                                </select>
+                            <p id="imageRatioInfo" class="text-xs text-blue-600 mt-2">Image Ratio: Upload an image</p>
+                        </div>
+                        <div class="control-group mb-4">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">Line Spacing (mm)</label>
+                            <input type="number" id="lineSpacing" value="1.0" step="0.1" class="input-elegant" />
+                        </div>
+                        <div class="control-group mb-4">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">MIN Line Width (Light)</label>
+                            <input type="number" id="minLineWidth" value="0.2" step="0.1" class="input-elegant" />
+                        </div>
+                        <div class="control-group mb-4">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">MAX Line Width (Dark)</label>
+                            <input type="number" id="maxLineWidth" value="0.8" step="0.1" class="input-elegant" />
+                        </div>
+
+                        <div class="control-group rounded-lg bg-gradient-to-r from-sky-50 to-blue-50 p-4 border border-sky-200 mb-4">
+                            <label class="block text-sm font-semibold text-blue-900 mb-2">⚡ Min/Max Speed (mm/s)</label>
+                            <div class="flex gap-3">
+                                <input
+                                    type="number"
+                                    id="minSpeed"
+                                    value="10"
+                                    step="0.1"
+                                    title="Speed for black (Slow/Glossy)"
+                                    class="input-elegant flex-1" />
+                                <input
+                                    type="number"
+                                    id="maxSpeed"
+                                    value="100"
+                                    step="0.1"
+                                    title="Speed for white (Fast/Matte)"
+                                    class="input-elegant flex-1" />
                             </div>
                         </div>
-                        <p class="text-[10px] text-blue-600 mt-2 italic leading-tight">
-                            The printer will start with the Base Slot and auto-switch to the Drawing Slot.
-                        </p>
+                        
+                        <div class="control-group mb-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-sm font-medium text-blue-900">🌗 Gamma Correction (1.0 = Neutral)</label>
+                                <span
+                                    id="gammaVal"
+                                    class="text-sm font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-blue-800"
+                                    >1.5</span
+                                >
+                            </div>
+                            <input
+                                type="range"
+                                id="gamma"
+                                min="0.5"
+                                max="3.0"
+                                step="0.1"
+                                value="1.5"
+                                class="w-full h-2 rounded-lg appearance-none bg-blue-100 accent-primary cursor-pointer" />
+                        </div>
+
+                        <div
+                            class="control-group rounded-lg bg-gradient-to-r from-indigo-50 to-blue-50 p-4 border border-indigo-200/80">
+                            <label class="block text-sm font-semibold text-blue-900 mb-2"
+                                >〰️ Max Squiggle Amplitude (mm, 0 disables)</label
+                            >
+                            <input
+                                type="number"
+                                id="squiggleAmp"
+                                value="0.3"
+                                step="0.1"
+                                title="Maximum wobble amplitude for deep black"
+                                class="input-elegant mb-3" />
+                            <label class="block text-sm font-medium text-blue-900 mb-1"
+                                >Squiggle Frequency (cycles per mm)</label
+                            >
+                            <input
+                                type="number"
+                                id="squiggleFreq"
+                                value="1"
+                                step="0.1"
+                                title="How many wobble cycles per mm of travel"
+                                class="input-elegant" />
+                        </div>
                     </div>
-                    <p class="text-xs text-blue-500 mt-4 border-t border-blue-200/50 pt-2">
-                        Base shape: circular (Spiral), square (Square Spiral), or follows print perimeter. Drawing
-                        starts on top after the filament change.
-                    </p>
                 </div>
-                <button
-                    id="generateBtn"
-                    type="button"
-                    class="w-full rounded-lg bg-gradient-btn hover:bg-gradient-btn-hover text-white font-semibold py-3 px-4 shadow-md shadow-blue-900/20 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
-                    🚀 Generate Preview and G-code
-                </button>
-                <button
-                    type="button"
-                    id="downloadBtn"
-                    class="hidden w-full rounded-lg bg-gradient-btn-secondary hover:opacity-90 text-white font-medium py-3 px-4 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2">
-                    📥 Download G-Code
-                </button>
-                <div class="control-group border-t pt-4 mt-4">
-                    <label class="block text-sm font-medium text-blue-900 mb-1">Use G-code template (optional)</label>
-                    <input
-                        type="file"
-                        id="gcodeTemplate"
-                        accept=".gcode"
-                        class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                    <p class="text-[10px] text-blue-600 mt-1">
-                        Upload a G-code file with a small cube (1x1x0,2mm) to use your starting and ending settings.
-                    </p>
+
+                <!-- SECTION 4: Base -->
+                <div class="accordion-section bg-gradient-panel">
+                    <div class="accordion-header" data-section="section4">
+                        <div class="accordion-header-content">
+                            <span class="text-2xl">🏗️</span>
+                            <span class="font-semibold text-blue-900">4. Base (optional)</span>
+                            <span class="accordion-badge badge-optional">Optional</span>
+                        </div>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content">
+                        <div
+                            class="control-group rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 p-4 border border-blue-200/80">
+                            <div class="flex items-center gap-3 mb-4">
+                                <input
+                                    type="checkbox"
+                                    id="addCircularBase"
+                                    class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
+                                <label
+                                    for="addCircularBase"
+                                    class="text-sm font-medium text-blue-900 cursor-pointer select-none"
+                                    >Add base (foundation for the artwork)</label
+                                >
+                            </div>
+
+                            <div id="baseControls" style="display: none;">
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div class="control-group">
+                                        <label class="block text-sm font-medium text-blue-900 mb-1">Base margin (mm)</label>
+                                        <input
+                                            type="number"
+                                            id="baseMargin"
+                                            value="2"
+                                            min="0"
+                                            step="0.5"
+                                            title="Margin between base edge and image"
+                                            class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2" />
+                                    </div>
+
+                                    <div class="control-group">
+                                        <label class="block text-sm font-medium text-blue-900 mb-1">Base layers (height)</label>
+                                        <input
+                                            type="number"
+                                            id="baseLayers"
+                                            value="2"
+                                            min="1"
+                                            step="1"
+                                            title="Number of layers for the base"
+                                            class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2" />
+                                    </div>
+                                </div>
+
+                                <div class="control-group mb-4">
+                                    <label class="block text-sm font-medium text-blue-900 mb-1">
+                                        Base Speed:
+                                        <span id="baseSpeedVal">100</span> mm/s
+                                    </label>
+                                    <input type="range" id="baseSpeed" min="10" max="150" step="1" value="30" class="w-full" />
+                                </div>
+
+                                <div class="border-t border-blue-200/60 my-4"></div>
+
+                                <div class="control-group mb-4">
+                                    <label class="block text-sm font-medium text-blue-900 mb-1">Filament Change Method</label>
+                                    <select
+                                        id="filamentChangeMode"
+                                        class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm">
+                                        <option value="manual">Manual Pause</option>
+                                        <option value="ams">Automatic (AMS)</option>
+                                    </select>
+                                </div>
+                                
+                                <div
+                                    id="amsSlotContainer"
+                                    class="control-group mt-3 hidden bg-blue-100/50 p-3 rounded-md border border-blue-200">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Base Slot</label>
+                                            <select id="amsBaseSlot" class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
+                                                <option value="T0" selected>Slot 1</option>
+                                                <option value="T1">Slot 2</option>
+                                                <option value="T2">Slot 3</option>
+                                                <option value="T3">Slot 4</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Drawing Slot</label>
+                                            <select id="amsDrawingSlot" class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
+                                                <option value="T0">Slot 1</option>
+                                                <option value="T1" selected>Slot 2</option>
+                                                <option value="T2">Slot 3</option>
+                                                <option value="T3">Slot 4</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <p class="text-[10px] text-blue-600 mt-2 italic leading-tight">
+                                        The printer will start with the Base Slot and auto-switch to the Drawing Slot.
+                                    </p>
+                                </div>
+                                
+                                <p class="text-xs text-blue-500 mt-4 border-t border-blue-200/50 pt-2">
+                                    Base shape: circular (Spiral), square (Square Spiral), or follows print perimeter. Drawing
+                                    starts on top after the filament change.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- SECTION 5: Advanced Options -->
+                <div class="accordion-section bg-gradient-panel">
+                    <div class="accordion-header" data-section="section5">
+                        <div class="accordion-header-content">
+                            <span class="text-2xl">⚙️</span>
+                            <span class="font-semibold text-blue-900">Advanced Options</span>
+                            <span class="accordion-badge badge-advanced">Advanced</span>
+                        </div>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="control-group">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">Use G-code template (optional)</label>
+                            <input
+                                type="file"
+                                id="gcodeTemplate"
+                                accept=".gcode"
+                                class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                            <p class="text-[10px] text-blue-600 mt-1">
+                                Upload a G-code file with a small cube (1x1x0,2mm) to use your starting and ending settings.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <div
                     id="stats"
                     class="stats hidden mt-4 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 text-blue-900 text-sm"></div>
@@ -400,6 +583,94 @@
         </div>
 
         <canvas id="hiddenCanvas" class="hidden"></canvas>
+        
+        <script>
+            // Accordion functionality
+            document.addEventListener('DOMContentLoaded', function() {
+                const accordionHeaders = document.querySelectorAll('.accordion-header');
+                
+                accordionHeaders.forEach(header => {
+                    header.addEventListener('click', function() {
+                        const content = this.nextElementSibling;
+                        const isActive = this.classList.contains('active');
+                        
+                        this.classList.toggle('active');
+                        
+                        if (isActive) {
+                            content.style.display = 'none';
+                        } else {
+                            content.style.display = 'block';
+                        }
+                    });
+                });
+                
+                // Path Type - show/hide Hilbert controls
+                const pathType = document.getElementById('pathType');
+                const hilbertSection = document.getElementById('hilbertSection');
+                
+                if (pathType && hilbertSection) {
+                    pathType.addEventListener('change', function() {
+                        if (this.value === 'hilbert') {
+                            hilbertSection.style.display = 'block';
+                        } else {
+                            hilbertSection.style.display = 'none';
+                        }
+                    });
+                }
+                
+                // Hilbert Order slider
+                const hilbertOrder = document.getElementById('hilbertOrder');
+                const orderVal = document.getElementById('orderVal');
+                if (hilbertOrder && orderVal) {
+                    hilbertOrder.addEventListener('input', function(e) {
+                        orderVal.textContent = e.target.value;
+                    });
+                }
+                
+                // Gamma slider
+                const gamma = document.getElementById('gamma');
+                const gammaVal = document.getElementById('gammaVal');
+                if (gamma && gammaVal) {
+                    gamma.addEventListener('input', function(e) {
+                        gammaVal.textContent = parseFloat(e.target.value).toFixed(1);
+                    });
+                }
+                
+                // Base checkbox - show/hide base controls
+                const addBase = document.getElementById('addCircularBase');
+                const baseControls = document.getElementById('baseControls');
+                if (addBase && baseControls) {
+                    addBase.addEventListener('change', function() {
+                        baseControls.style.display = this.checked ? 'block' : 'none';
+                    });
+                }
+                
+                // Base speed slider
+                const baseSpeed = document.getElementById('baseSpeed');
+                const baseSpeedVal = document.getElementById('baseSpeedVal');
+                if (baseSpeed && baseSpeedVal) {
+                    baseSpeed.addEventListener('input', function(e) {
+                        baseSpeedVal.textContent = e.target.value;
+                    });
+                }
+                
+                // Filament Change Mode - show/hide AMS slots
+                const filamentChangeMode = document.getElementById('filamentChangeMode');
+                const amsSlotContainer = document.getElementById('amsSlotContainer');
+                if (filamentChangeMode && amsSlotContainer) {
+                    filamentChangeMode.addEventListener('change', function() {
+                        if (this.value === 'ams') {
+                            amsSlotContainer.classList.remove('hidden');
+                        } else {
+                            amsSlotContainer.classList.add('hidden');
+                        }
+                    });
+                }
+                
+                console.log('✅ Accordion UI initialized');
+            });
+        </script>
+        
         <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
         <script src="https://carlobalde-lang.github.io/gcode-art-generator/script.js"></script>
     </body>
