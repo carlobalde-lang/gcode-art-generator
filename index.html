@@ -298,33 +298,26 @@
                             <option value="ams">Automatic (AMS)</option>
                         </select>
                     </div>
-
                     <div
                         id="amsSlotContainer"
                         class="control-group mt-3 hidden bg-blue-100/50 p-3 rounded-md border border-blue-200">
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Base Slot</label>
-                                <select
-                                    id="amsBaseSlot"
-                                    class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
-                                    <option value="T0" selected>Slot 1 (T0)</option>
-                                    <option value="T1">Slot 2 (T1)</option>
-                                    <option value="T2">Slot 3 (T2)</option>
-                                    <option value="T3">Slot 4 (T3)</option>
+                                <select id="amsBaseSlot" class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
+                                    <option value="T0" selected>Slot 1</option>
+                                    <option value="T1">Slot 2</option>
+                                    <option value="T2">Slot 3</option>
+                                    <option value="T3">Slot 4</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide"
-                                    >Drawing Slot</label
-                                >
-                                <select
-                                    id="amsDrawingSlot"
-                                    class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
-                                    <option value="T0">Slot 1 (T0)</option>
-                                    <option value="T1" selected>Slot 2 (T1)</option>
-                                    <option value="T2">Slot 3 (T2)</option>
-                                    <option value="T3">Slot 4 (T3)</option>
+                                <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Drawing Slot</label>
+                                <select id="amsDrawingSlot" class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
+                                    <option value="T0">Slot 1</option>
+                                    <option value="T1" selected>Slot 2</option>
+                                    <option value="T2">Slot 3</option>
+                                    <option value="T3">Slot 4</option>
                                 </select>
                             </div>
                         </div>
@@ -332,13 +325,11 @@
                             The printer will start with the Base Slot and auto-switch to the Drawing Slot.
                         </p>
                     </div>
-
                     <p class="text-xs text-blue-500 mt-4 border-t border-blue-200/50 pt-2">
                         Base shape: circular (Spiral), square (Square Spiral), or follows print perimeter. Drawing
                         starts on top after the filament change.
                     </p>
                 </div>
-
                 <button
                     id="generateBtn"
                     type="button"
