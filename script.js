@@ -1223,13 +1223,18 @@ function mergeWithTemplate(artGcode) {
     // RECUPERO VARIABILI UI
     const mode = document.getElementById("filamentChangeMode")?.value || "manual";
     const amsBaseSlot = document.getElementById("amsBaseSlot")?.value || "T0";
-    const amsDrawingSlot = document.getElementById("amsDrawingSlot")?.value || "T1";
+    // const amsDrawingSlot = document.getElementById("amsDrawingSlot")?.value || "T1"; // Non serve qui
 
     // GENERAZIONE COMANDO CAMBIO
     let changeCommand = "";
+    
     if (mode === "ams") {
-        changeCommand = `\n; --- CAMBIO AUTOMATICO ACE/AMS ---\n${amsDrawingSlot}\n`;
+        // --- FIX: In modalità AMS non aggiungiamo nulla qui ---
+        // La funzione processImage() ha già inserito il comando corretto (T2 o T3)
+        // come primissima riga di 'artGcode'.
+        changeCommand = ""; 
     } else {
+        // In manuale manteniamo la pausa M600 per permettere il cambio filo
         changeCommand = "\n; --- PAUSA MANUALE ---\nM600\n";
     }
 
@@ -1240,9 +1245,10 @@ function mergeWithTemplate(artGcode) {
                      artGcode + 
                      "\n; --- END ARTWORK ---\n";
 
-    // RITORNO AL COLORE BASE (Solo per AMS)
+    // RITORNO AL COLORE BASE (Opzionale, solo per AMS)
+    // Se vuoi che alla fine della stampa la stampante ricarichi il colore base
     if (mode === "ams") {
-        finalGcode += `\n${amsBaseSlot}\n; --- RIPRISTINO BASE ---\n`;
+        finalGcode += `\n${amsBaseSlot} ; Reset to base slot\n; --- RIPRISTINO BASE ---\n`;
     }
 
     return finalGcode + footer;
