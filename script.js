@@ -498,8 +498,8 @@ function writeBaseSegment(x, y, customSpeed = baseSpeed) {
             gcode.push(`G0 Z${(z + 0.4).toFixed(3)} F6000 ; Z-Hop di sicurezza`);
 
             let goingRight = true;
-            // Ridotto l'overlap da +0.1 a -0.05 per non "pestare" i muri
-            const fillLimitRadius = baseRadius - (numWalls * wallSpacing) - 0.05; 
+            // Ridotto l'overlap da +0.1
+            const fillLimitRadius = baseRadius - (numWalls * wallSpacing) + 0.1; 
             const infillTotalHeight = fillLimitRadius * 2;
 
             for (let yRel = -fillLimitRadius; yRel <= fillLimitRadius; yRel += baseOverlap) {
