@@ -1245,12 +1245,6 @@ function mergeWithTemplate(artGcode) {
                      artGcode + 
                      "\n; --- END ARTWORK ---\n";
 
-    // RITORNO AL COLORE BASE (Opzionale, solo per AMS)
-    // Se vuoi che alla fine della stampa la stampante ricarichi il colore base
-    if (mode === "ams") {
-        finalGcode += `\n${amsBaseSlot} ; Reset to base slot\n; --- RIPRISTINO BASE ---\n`;
-    }
-
     return finalGcode + footer;
 }
 
