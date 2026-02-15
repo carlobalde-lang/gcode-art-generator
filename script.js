@@ -439,7 +439,7 @@ function processImage() {
 
     let drawingStartZ = zOffset;
 
-function writeBaseSegment(x, y, customSpeed = baseSpeed) {
+    function writeBaseSegment(x, y, customSpeed = baseSpeed) {
         const dist = Math.hypot(x - prevX, y - prevY);
         if (dist < 0.01) return;
         const vol = dist * BASE_LINE_WIDTH * layerHeight;
@@ -483,7 +483,8 @@ function writeBaseSegment(x, y, customSpeed = baseSpeed) {
                 const startY = centerY;
 
                 gcode.push(`G0 X${startX.toFixed(3)} Y${startY.toFixed(3)} F6000`);
-                prevX = startX; prevY = startY;
+                prevX = startX;
+                prevY = startY;
 
                 for (let i = 1; i <= numPoints; i++) {
                     const angle = i * dAngle;
@@ -499,7 +500,7 @@ function writeBaseSegment(x, y, customSpeed = baseSpeed) {
 
             let goingRight = true;
             // Ridotto l'overlap da +0.1 a -0.05 per non "pestare" i muri test a 0
-            const fillLimitRadius = baseRadius - (numWalls * wallSpacing); 
+            const fillLimitRadius = baseRadius - numWalls * wallSpacing;
             const infillTotalHeight = fillLimitRadius * 2;
 
             for (let yRel = -fillLimitRadius; yRel <= fillLimitRadius; yRel += baseOverlap) {
@@ -510,23 +511,26 @@ function writeBaseSegment(x, y, customSpeed = baseSpeed) {
 
                 // --- NOVITÀ: VELOCITÀ RIDOTTA NEL PRIMO 10% ---
                 let currentSpeed = baseSpeed;
-                if (yRel < (-fillLimitRadius + (infillTotalHeight * 0.10))) {
+                if (yRel < -fillLimitRadius + infillTotalHeight * 0.1) {
                     currentSpeed = baseSpeed * 0.5; // Vai al 50% della velocità
                 }
 
                 if (goingRight) {
                     if (yRel === -fillLimitRadius || Math.abs(yRel + fillLimitRadius) < 0.01) {
                         gcode.push(`G0 X${xLeft.toFixed(3)} Y${currentY.toFixed(3)} F6000`);
-                        gcode.push(`G1 Z${z.toFixed(3)} F1000 ; Torna in quota`);
-                        gcode.push(`G1 E0.8 F3000 ; Prime (ripristino filo)`);
-                        prevX = xLeft; prevY = currentY;
+                        gcode.push(`G1 Z${z.toFixed(3)} F1000`);
+                        gcode.push(`G1 E0.9 F3000 ; Prime leggermente aumentato`); // Correzione punto 1
+                        prevX = xLeft;
+                        prevY = currentY;
                     } else {
                         writeBaseSegment(xLeft, currentY, currentSpeed);
                     }
-                    writeBaseSegment(xRight, currentY, currentSpeed);
+                    // Sottraiamo 0.1mm dalla coordinata finale X per fermare l'estrusione un pelo prima
+                    writeBaseSegment(xRight - 0.1, currentY, currentSpeed);
                 } else {
                     writeBaseSegment(xRight, currentY, currentSpeed);
-                    writeBaseSegment(xLeft, currentY, currentSpeed);
+                    // Sottraiamo 0.1mm dalla coordinata finale X (lato sinistro)
+                    writeBaseSegment(xLeft + 0.1, currentY, currentSpeed);
                 }
                 goingRight = !goingRight;
             }
@@ -556,17 +560,19 @@ function writeBaseSegment(x, y, customSpeed = baseSpeed) {
 
         drawingStartZ = zOffset + baseLayers * layerHeight;
         gcode.push(`; --- STARTING ARTWORK DRAWING ---`);
-        
+
         // 1. Spostamento rapido sopra il punto di inizio
-        gcode.push(`G0 X${startPoint.x.toFixed(3)} Y${startPoint.y.toFixed(3)} Z${(drawingStartZ + 2).toFixed(3)} F6000`);
-        
+        gcode.push(
+            `G0 X${startPoint.x.toFixed(3)} Y${startPoint.y.toFixed(3)} Z${(drawingStartZ + 2).toFixed(3)} F6000`
+        );
+
         // 2. Discesa lenta in quota stampa
         gcode.push(`G1 Z${drawingStartZ.toFixed(3)} F1000`);
-        
+
         // 3. PRIMING: Estrude una piccolissima quantità stando fermi per riempire l'ugello
         gcode.push(`G1 E0.5 F600 ; Prime nozzle prima di partire`);
         gcode.push(`G4 P200 ; Pausa di 0.2 secondi per stabilizzare`);
-        
+
         // 4. Inizio effettivo con velocità ridotta per i primi millimetri
         // Reset posizione precedente
         prevX = startPoint.x;
@@ -1192,7 +1198,7 @@ function update3DPreviewFromGcode(gcode) {
 // --- FUNZIONI DI SISTEMA ---
 function downloadGcode() {
     if (!gcodeContent || gcodeContent.length < 10) {
-        alert("Genera prima il G-code!");
+        alert("First generate G-code");
         return;
     }
     const blob = new Blob([gcodeContent], { type: "text/plain" });
@@ -1208,7 +1214,7 @@ function downloadGcode() {
 
 function mergeWithTemplate(artGcode) {
     if (!gcodeTemplateContent) {
-        alert("Errore: Carica prima il file base.gcode!");
+        alert("First load the base gcode");
         return artGcode;
     }
 
@@ -1219,7 +1225,7 @@ function mergeWithTemplate(artGcode) {
     // SCANSIONE: Cerca SOLO i nuovi marker definitivi
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].toUpperCase();
-        
+
         // Cerca start anche se ci sono altri caratteri nella riga
         if (line.includes(";START_ART")) {
             startIndex = i;
@@ -1232,20 +1238,20 @@ function mergeWithTemplate(artGcode) {
 
     // Se manca lo START, blocchiamo tutto
     if (startIndex === -1) {
-        alert("ERRORE: Marker ;START_ART non trovato nel template.");
+        alert("Didn't found marker ;START_ART in the base gcode.");
         return gcodeTemplateContent + "\n" + artGcode;
     }
 
     // HEADER: Tutto fino allo START compreso
-    const header = lines.slice(0, startIndex + 1).join('\n');
-    
+    const header = lines.slice(0, startIndex + 1).join("\n");
+
     // FOOTER: Tutto dall'END compreso in poi (se esiste)
     let footer = "";
     if (endIndex !== -1 && endIndex > startIndex) {
-        footer = lines.slice(endIndex).join('\n');
+        footer = lines.slice(endIndex).join("\n");
     } else {
         // Fallback solo se ti sei dimenticato di scrivere END_ART
-        footer = lines.slice(startIndex + 1).join('\n');
+        footer = lines.slice(startIndex + 1).join("\n");
     }
 
     // RECUPERO VARIABILI UI
@@ -1255,23 +1261,19 @@ function mergeWithTemplate(artGcode) {
 
     // GENERAZIONE COMANDO CAMBIO
     let changeCommand = "";
-    
+
     if (mode === "ams") {
         // --- FIX: In modalità AMS non aggiungiamo nulla qui ---
         // La funzione processImage() ha già inserito il comando corretto (T2 o T3)
         // come primissima riga di 'artGcode'.
-        changeCommand = ""; 
+        changeCommand = "";
     } else {
         // In manuale manteniamo la pausa M600 per permettere il cambio filo
         changeCommand = "\n; --- PAUSA MANUALE ---\nM600\n";
     }
 
     // COSTRUZIONE FINALE
-    let finalGcode = header + 
-                     changeCommand + 
-                     "\n; --- START ARTWORK ---\n" + 
-                     artGcode + 
-                     "\n; --- END ARTWORK ---\n";
+    let finalGcode = header + changeCommand + "\n; --- START ARTWORK ---\n" + artGcode + "\n; --- END ARTWORK ---\n";
 
     return finalGcode + footer;
 }
@@ -1290,5 +1292,4 @@ document.addEventListener("DOMContentLoaded", () => {
             if (display) display.innerText = e.target.value;
         });
     });
-
 });
