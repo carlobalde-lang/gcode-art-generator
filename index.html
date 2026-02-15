@@ -14,7 +14,7 @@
                             "primary-hover": "#1d4ed8",
                             "blue-muted": "#1e3a5f",
                             "blue-soft": "#dbeafe",
-                            "blue-soft-2": "#e0e7ff",
+                            "blue-soft-2": "#e0e7ff"
                         },
                         backgroundImage: {
                             "gradient-page": "linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #e0e7ff 100%)",
@@ -25,21 +25,23 @@
                             "gradient-btn-secondary": "linear-gradient(180deg, #64748b 0%, #475569 100%)",
                             "gradient-notice": "linear-gradient(90deg, #dbeafe 0%, #bfdbfe 100%)",
                             "gradient-info": "linear-gradient(90deg, #e0f2fe 0%, #bae6fd 100%)",
-                            "gradient-accent": "linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)",
-                        },
-                    },
-                },
+                            "gradient-accent": "linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)"
+                        }
+                    }
+                }
             };
         </script>
         <link rel="stylesheet" href="https://carlobalde-lang.github.io/gcode-art-generator/styles.css" />
-        <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
     </head>
     <body class="bg-gradient-page text-blue-muted p-5 font-sans antialiased min-h-screen">
-        <h1 class="col-span-full text-center text-2xl font-bold mb-2 bg-gradient-heading bg-clip-text text-transparent">🌀 G-Code Art Generator</h1>
+        <h1 class="col-span-full text-center text-2xl font-bold mb-2 bg-gradient-heading bg-clip-text text-transparent">
+            🌀 G-Code Art Generator
+        </h1>
 
         <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6">
             <!-- Notice banner (blue variation) -->
-            <div class="col-span-full rounded-r-lg border-l-4 border-blue-500 bg-gradient-notice text-blue-900 px-4 py-3 text-sm shadow-sm">
+            <div
+                class="col-span-full rounded-r-lg border-l-4 border-blue-500 bg-gradient-notice text-blue-900 px-4 py-3 text-sm shadow-sm">
                 ⚠️ <strong>ATTENTION:</strong> Use this code at your own risk!
             </div>
 
@@ -50,21 +52,35 @@
                     type="file"
                     id="imageInput"
                     accept="image/*"
-                    class="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-100 file:text-blue-800 file:font-medium hover:file:bg-blue-200 file:cursor-pointer file:transition"
-                />
+                    class="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-100 file:text-blue-800 file:font-medium hover:file:bg-blue-200 file:cursor-pointer file:transition" />
 
-                <div class="flex items-center gap-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 p-3 border border-blue-200/80">
-                    <input type="checkbox" id="mirrorimage" class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
-                    <label for="mirrorimage" class="text-sm font-medium text-blue-900 cursor-pointer select-none">Mirror image</label>
+                <div
+                    class="flex items-center gap-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 p-3 border border-blue-200/80">
+                    <input
+                        type="checkbox"
+                        id="mirrorimage"
+                        class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
+                    <label for="mirrorimage" class="text-sm font-medium text-blue-900 cursor-pointer select-none"
+                        >Mirror image</label
+                    >
                 </div>
-                <div class="flex items-center gap-3 rounded-lg bg-gradient-to-r from-sky-50 to-blue-50 p-3 border border-sky-200/80">
-                    <input type="checkbox" id="hideImageOverlay" checked class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
-                    <label for="hideImageOverlay" class="text-sm font-medium text-blue-900 cursor-pointer select-none">Show Image Preview Overlay</label>
+                <div
+                    class="flex items-center gap-3 rounded-lg bg-gradient-to-r from-sky-50 to-blue-50 p-3 border border-sky-200/80">
+                    <input
+                        type="checkbox"
+                        id="hideImageOverlay"
+                        checked
+                        class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
+                    <label for="hideImageOverlay" class="text-sm font-medium text-blue-900 cursor-pointer select-none"
+                        >Show Image Preview Overlay</label
+                    >
                 </div>
 
                 <div class="control-group rounded-lg bg-gradient-accent p-4 border border-indigo-200/80">
                     <label class="block text-sm font-semibold text-blue-900 mb-2">📍 Path Type</label>
-                    <select id="pathType" class="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 transition">
+                    <select
+                        id="pathType"
+                        class="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 transition">
                         <option value="spiral">Spiral</option>
                         <option value="zigzag">Zig-Zag (Horizontal)</option>
                         <option value="squareSpiral">Square Spiral</option>
@@ -72,20 +88,41 @@
                         <option value="diagonal">Diagonals</option>
                     </select>
                 </div>
-                <div class="control-group rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border border-blue-200/80">
+                <div
+                    class="control-group rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border border-blue-200/80">
                     <div class="flex justify-between items-center mb-2">
                         <label class="text-sm font-semibold text-blue-900">📉 Hilbert Density</label>
-                        <span id="orderVal" class="text-sm font-mono bg-white/90 px-2 py-0.5 rounded border border-blue-200 text-blue-800">6</span>
+                        <span
+                            id="orderVal"
+                            class="text-sm font-mono bg-white/90 px-2 py-0.5 rounded border border-blue-200 text-blue-800"
+                            >6</span
+                        >
                     </div>
-                    <input type="range" id="hilbertOrder" min="3" max="8" step="1" value="6" class="w-full h-2 rounded-lg appearance-none bg-blue-100 accent-primary cursor-pointer" title="Hilbert curve order" />
+                    <input
+                        type="range"
+                        id="hilbertOrder"
+                        min="3"
+                        max="8"
+                        step="1"
+                        value="6"
+                        class="w-full h-2 rounded-lg appearance-none bg-blue-100 accent-primary cursor-pointer"
+                        title="Hilbert curve order" />
                 </div>
 
-                <div class="control-group rounded-lg bg-gradient-to-r from-blue-100 to-sky-100 p-4 border border-blue-300 border-l-4 border-l-blue-500">
+                <div
+                    class="control-group rounded-lg bg-gradient-to-r from-blue-100 to-sky-100 p-4 border border-blue-300 border-l-4 border-l-blue-500">
                     <label class="block text-sm font-semibold text-blue-900 mb-2">📐 Bed Size (mm)</label>
-                    <input type="number" id="bedSize" value="250" title="Total X/Y bed dimensions" class="input-elegant" />
+                    <input
+                        type="number"
+                        id="bedSize"
+                        value="250"
+                        title="Total X/Y bed dimensions"
+                        class="input-elegant" />
                 </div>
 
-                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">2. Print Parameters</h3>
+                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">
+                    2. Print Parameters
+                </h3>
                 <div class="control-group">
                     <label class="block text-sm font-medium text-blue-900 mb-1">Filament Diameter (mm)</label>
                     <input type="number" id="filamentDia" value="1.75" step="0.01" class="input-elegant" />
@@ -99,12 +136,28 @@
                     <input type="number" id="zOffset" value="0.2" step="0.01" class="input-elegant" />
                 </div>
 
-                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">3. Lines & Effects</h3>
+                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">
+                    3. Lines & Effects
+                </h3>
                 <div class="control-group">
-                    <label class="block text-sm font-medium text-blue-900 mb-1">📐 Print Dimensions (mm) – Proportional</label>
+                    <label class="block text-sm font-medium text-blue-900 mb-1"
+                        >📐 Print Dimensions (mm) – Proportional</label
+                    >
                     <div class="flex gap-3">
-                        <input type="number" id="printWidth" value="180" step="1" title="Final print Width (X)" class="input-elegant flex-1" />
-                        <input type="number" id="printHeight" value="180" step="1" title="Final print Height (Y)" class="input-elegant flex-1" />
+                        <input
+                            type="number"
+                            id="printWidth"
+                            value="180"
+                            step="1"
+                            title="Final print Width (X)"
+                            class="input-elegant flex-1" />
+                        <input
+                            type="number"
+                            id="printHeight"
+                            value="180"
+                            step="1"
+                            title="Final print Height (Y)"
+                            class="input-elegant flex-1" />
                     </div>
                     <p id="imageRatioInfo" class="text-xs text-blue-600 mt-2">Image Ratio: Upload an image</p>
                 </div>
@@ -124,121 +177,204 @@
                 <div class="control-group rounded-lg bg-gradient-to-r from-sky-50 to-blue-50 p-4 border border-sky-200">
                     <label class="block text-sm font-semibold text-blue-900 mb-2">⚡ Min/Max Speed (mm/s)</label>
                     <div class="flex gap-3">
-                        <input type="number" id="minSpeed" value="10" step="0.1" title="Speed for black (Slow/Glossy)" class="input-elegant flex-1" />
-                        <input type="number" id="maxSpeed" value="100" step="0.1" title="Speed for white (Fast/Matte)" class="input-elegant flex-1" />
+                        <input
+                            type="number"
+                            id="minSpeed"
+                            value="10"
+                            step="0.1"
+                            title="Speed for black (Slow/Glossy)"
+                            class="input-elegant flex-1" />
+                        <input
+                            type="number"
+                            id="maxSpeed"
+                            value="100"
+                            step="0.1"
+                            title="Speed for white (Fast/Matte)"
+                            class="input-elegant flex-1" />
                     </div>
                 </div>
                 <div class="control-group">
                     <div class="flex justify-between items-center mb-2">
                         <label class="text-sm font-medium text-blue-900">🌗 Gamma Correction (1.0 = Neutral)</label>
-                        <span id="gammaVal" class="text-sm font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-blue-800">1.5</span>
+                        <span
+                            id="gammaVal"
+                            class="text-sm font-mono bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-blue-800"
+                            >1.5</span
+                        >
                     </div>
-                    <input type="range" id="gamma" min="0.5" max="3.0" step="0.1" value="1.5" class="w-full h-2 rounded-lg appearance-none bg-blue-100 accent-primary cursor-pointer" />
+                    <input
+                        type="range"
+                        id="gamma"
+                        min="0.5"
+                        max="3.0"
+                        step="0.1"
+                        value="1.5"
+                        class="w-full h-2 rounded-lg appearance-none bg-blue-100 accent-primary cursor-pointer" />
                 </div>
 
-                <div class="control-group rounded-lg bg-gradient-to-r from-indigo-50 to-blue-50 p-4 border border-indigo-200/80">
-                    <label class="block text-sm font-semibold text-blue-900 mb-2">〰️ Max Squiggle Amplitude (mm, 0 disables)</label>
-                    <input type="number" id="squiggleAmp" value="0.3" step="0.1" title="Maximum wobble amplitude for deep black" class="input-elegant mb-3" />
-                    <label class="block text-sm font-medium text-blue-900 mb-1">Squiggle Frequency (cycles per mm)</label>
-                    <input type="number" id="squiggleFreq" value="1" step="0.1" title="How many wobble cycles per mm of travel" class="input-elegant" />
+                <div
+                    class="control-group rounded-lg bg-gradient-to-r from-indigo-50 to-blue-50 p-4 border border-indigo-200/80">
+                    <label class="block text-sm font-semibold text-blue-900 mb-2"
+                        >〰️ Max Squiggle Amplitude (mm, 0 disables)</label
+                    >
+                    <input
+                        type="number"
+                        id="squiggleAmp"
+                        value="0.3"
+                        step="0.1"
+                        title="Maximum wobble amplitude for deep black"
+                        class="input-elegant mb-3" />
+                    <label class="block text-sm font-medium text-blue-900 mb-1"
+                        >Squiggle Frequency (cycles per mm)</label
+                    >
+                    <input
+                        type="number"
+                        id="squiggleFreq"
+                        value="1"
+                        step="0.1"
+                        title="How many wobble cycles per mm of travel"
+                        class="input-elegant" />
                 </div>
 
-<h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">4. Base (optional)</h3>
-<div class="control-group rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 p-4 border border-blue-200/80">
-    
-    <div class="flex items-center gap-3 mb-4">
-        <input type="checkbox" id="addCircularBase" class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
-        <label for="addCircularBase" class="text-sm font-medium text-blue-900 cursor-pointer select-none">Add base (foundation for the artwork)</label>
-    </div>
+                <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 pt-2">
+                    4. Base (optional)
+                </h3>
+                <div
+                    class="control-group rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 p-4 border border-blue-200/80">
+                    <div class="flex items-center gap-3 mb-4">
+                        <input
+                            type="checkbox"
+                            id="addCircularBase"
+                            class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
+                        <label
+                            for="addCircularBase"
+                            class="text-sm font-medium text-blue-900 cursor-pointer select-none"
+                            >Add base (foundation for the artwork)</label
+                        >
+                    </div>
 
-    <div class="grid grid-cols-2 gap-4">
-        <div class="control-group">
-            <label class="block text-sm font-medium text-blue-900 mb-1">Base margin (mm)</label>
-            <input type="number" id="baseMargin" value="2" min="0" step="0.5" title="Margin between base edge and image" class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2" />
-        </div>
-        
-        <div class="control-group">
-            <label class="block text-sm font-medium text-blue-900 mb-1">Base layers (height)</label>
-            <input type="number" id="baseLayers" value="2" min="1" step="1" title="Number of layers for the base" class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2" />
-        </div>
-        
-        <div class="control-group">
-    <label class="block text-sm font-medium text-blue-900 mb-1">
-        Base Speed: 
-        <span id="baseSpeedVal">100</span> mm/s
-    </label>
-    <input 
-        type="range" 
-        id="baseSpeed" 
-        min="10" 
-        max="150" 
-        step="1" 
-        value="30"
-    >
-</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="control-group">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">Base margin (mm)</label>
+                            <input
+                                type="number"
+                                id="baseMargin"
+                                value="2"
+                                min="0"
+                                step="0.5"
+                                title="Margin between base edge and image"
+                                class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2" />
+                        </div>
 
-        
-    </div>
+                        <div class="control-group">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">Base layers (height)</label>
+                            <input
+                                type="number"
+                                id="baseLayers"
+                                value="2"
+                                min="1"
+                                step="1"
+                                title="Number of layers for the base"
+                                class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2" />
+                        </div>
 
-    <div class="border-t border-blue-200/60 my-4"></div>
+                        <div class="control-group">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">
+                                Base Speed:
+                                <span id="baseSpeedVal">100</span> mm/s
+                            </label>
+                            <input type="range" id="baseSpeed" min="10" max="150" step="1" value="30" />
+                        </div>
+                    </div>
 
-<div class="control-group">
-    <label class="block text-sm font-medium text-blue-900 mb-1">Filament Change Method</label>
-    <select id="filamentChangeMode" class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm">
-        <option value="manual">Manual Pause (M600 / Standard)</option>
-        <option value="ams">Automatic (AMS / Kobra 3 ACE)</option>
-    </select>
-</div>
+                    <div class="border-t border-blue-200/60 my-4"></div>
 
-<div id="amsSlotContainer" class="control-group mt-3 hidden bg-blue-100/50 p-3 rounded-md border border-blue-200">
-    <div class="grid grid-cols-2 gap-3">
-        <div>
-            <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Base Slot</label>
-            <select id="amsBaseSlot" class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
-                <option value="T0" selected>Slot 1 (T0)</option>
-                <option value="T1">Slot 2 (T1)</option>
-                <option value="T2">Slot 3 (T2)</option>
-                <option value="T3">Slot 4 (T3)</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Drawing Slot</label>
-            <select id="amsDrawingSlot" class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
-                <option value="T0">Slot 1 (T0)</option>
-                <option value="T1" selected>Slot 2 (T1)</option>
-                <option value="T2">Slot 3 (T2)</option>
-                <option value="T3">Slot 4 (T3)</option>
-            </select>
-        </div>
-    </div>
-    <p class="text-[10px] text-blue-600 mt-2 italic leading-tight">The printer will start with the Base Slot and auto-switch to the Drawing Slot.</p>
-</div>
+                    <div class="control-group">
+                        <label class="block text-sm font-medium text-blue-900 mb-1">Filament Change Method</label>
+                        <select
+                            id="filamentChangeMode"
+                            class="w-full bg-white border border-blue-200 text-blue-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 shadow-sm">
+                            <option value="manual">Manual Pause</option>
+                            <option value="ams">Automatic (AMS)</option>
+                        </select>
+                    </div>
 
-    <p class="text-xs text-blue-500 mt-4 border-t border-blue-200/50 pt-2">
-        Base shape: circular (Spiral), square (Square Spiral), or follows print perimeter. 
-        Drawing starts on top after the filament change.
-    </p>
-</div>
+                    <div
+                        id="amsSlotContainer"
+                        class="control-group mt-3 hidden bg-blue-100/50 p-3 rounded-md border border-blue-200">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide">Base Slot</label>
+                                <select
+                                    id="amsBaseSlot"
+                                    class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
+                                    <option value="T0" selected>Slot 1 (T0)</option>
+                                    <option value="T1">Slot 2 (T1)</option>
+                                    <option value="T2">Slot 3 (T2)</option>
+                                    <option value="T3">Slot 4 (T3)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-blue-800 mb-1 uppercase tracking-wide"
+                                    >Drawing Slot</label
+                                >
+                                <select
+                                    id="amsDrawingSlot"
+                                    class="w-full bg-white border border-blue-300 text-blue-900 text-sm rounded-lg p-2">
+                                    <option value="T0">Slot 1 (T0)</option>
+                                    <option value="T1" selected>Slot 2 (T1)</option>
+                                    <option value="T2">Slot 3 (T2)</option>
+                                    <option value="T3">Slot 4 (T3)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-blue-600 mt-2 italic leading-tight">
+                            The printer will start with the Base Slot and auto-switch to the Drawing Slot.
+                        </p>
+                    </div>
 
-                <button id="generateBtn" type="button" class="w-full rounded-lg bg-gradient-btn hover:bg-gradient-btn-hover text-white font-semibold py-3 px-4 shadow-md shadow-blue-900/20 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                    <p class="text-xs text-blue-500 mt-4 border-t border-blue-200/50 pt-2">
+                        Base shape: circular (Spiral), square (Square Spiral), or follows print perimeter. Drawing
+                        starts on top after the filament change.
+                    </p>
+                </div>
+
+                <button
+                    id="generateBtn"
+                    type="button"
+                    class="w-full rounded-lg bg-gradient-btn hover:bg-gradient-btn-hover text-white font-semibold py-3 px-4 shadow-md shadow-blue-900/20 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                     🚀 Generate Preview and G-code
                 </button>
-                <button type="button" id="downloadBtn" class="hidden w-full rounded-lg bg-gradient-btn-secondary hover:opacity-90 text-white font-medium py-3 px-4 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2">
+                <button
+                    type="button"
+                    id="downloadBtn"
+                    class="hidden w-full rounded-lg bg-gradient-btn-secondary hover:opacity-90 text-white font-medium py-3 px-4 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2">
                     📥 Download G-Code
                 </button>
-<div class="control-group border-t pt-4 mt-4">
-    <label class="block text-sm font-medium text-blue-900 mb-1">Use G-code template (optional)</label>
-    <input type="file" id="gcodeTemplate" accept=".gcode" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-    <p class="text-[10px] text-blue-600 mt-1">Upload a G-code file with a small cube (1x1x0,2mm) to use your starting and ending settings.</p>
-</div>
-                <div id="stats" class="stats hidden mt-4 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 text-blue-900 text-sm"></div>
+                <div class="control-group border-t pt-4 mt-4">
+                    <label class="block text-sm font-medium text-blue-900 mb-1">Use G-code template (optional)</label>
+                    <input
+                        type="file"
+                        id="gcodeTemplate"
+                        accept=".gcode"
+                        class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                    <p class="text-[10px] text-blue-600 mt-1">
+                        Upload a G-code file with a small cube (1x1x0,2mm) to use your starting and ending settings.
+                    </p>
+                </div>
+                <div
+                    id="stats"
+                    class="stats hidden mt-4 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 text-blue-900 text-sm"></div>
             </div>
 
             <!-- Right panel: preview -->
-            <div class="bg-gradient-panel rounded-xl shadow-lg p-6 text-center preview-container border border-blue-100/60">
+            <div
+                class="bg-gradient-panel rounded-xl shadow-lg p-6 text-center preview-container border border-blue-100/60">
                 <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 mb-3">Path Preview</h3>
-                <div class="rounded-r-lg border-l-4 border-blue-500 bg-gradient-info text-blue-900 px-4 py-3 text-sm mb-4 text-left shadow-sm">
-                    <strong>Zoom & Pan:</strong> Click and drag to pan. Mouse wheel to zoom. Click "Generate" to apply changes to G-code.
+                <div
+                    class="rounded-r-lg border-l-4 border-blue-500 bg-gradient-info text-blue-900 px-4 py-3 text-sm mb-4 text-left shadow-sm">
+                    <strong>Zoom & Pan:</strong> Click and drag to pan. Mouse wheel to zoom. Click "Generate" to apply
+                    changes to G-code.
                 </div>
                 <canvas id="previewCanvas"></canvas>
 
@@ -249,24 +385,31 @@
                     </p>
                     <div
                         id="preview3dContainer"
-                        class="w-full aspect-square rounded-lg bg-slate-900/90 border border-blue-500/40 overflow-hidden">
-                    </div>
+                        class="w-full aspect-square rounded-lg bg-slate-900/90 border border-blue-500/40 overflow-hidden"></div>
                 </div>
             </div>
 
-            <form action="https://www.paypal.com/donate" method="post" target="_top" class="col-span-full flex justify-center mt-4">
+            <form
+                action="https://www.paypal.com/donate"
+                method="post"
+                target="_top"
+                class="col-span-full flex justify-center mt-4">
                 <input type="hidden" name="business" value="34JJ7YWBQ6PGA" />
                 <input type="hidden" name="no_recurring" value="0" />
                 <input type="hidden" name="currency_code" value="EUR" />
-                <input type="image" src="https://www.paypalobjects.com/en_US/IT/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+                <input
+                    type="image"
+                    src="https://www.paypalobjects.com/en_US/IT/i/btn/btn_donateCC_LG.gif"
+                    border="0"
+                    name="submit"
+                    title="PayPal - The safer, easier way to pay online!"
+                    alt="Donate with PayPal button" />
                 <img alt="" border="0" src="https://www.paypal.com/en_IT/i/scr/pixel.gif" width="1" height="1" />
             </form>
         </div>
 
         <canvas id="hiddenCanvas" class="hidden"></canvas>
-                <script src="https://carlobalde-lang.github.io/gcode-art-generator/script.js"></script>
-
+        <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+        <script src="https://carlobalde-lang.github.io/gcode-art-generator/script.js"></script>
     </body>
 </html>
-
-
