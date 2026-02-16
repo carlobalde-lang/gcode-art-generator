@@ -167,13 +167,39 @@
 
             <!-- Left panel: controls -->
             <div class="space-y-4">
+                <!-- SECTION gcode upload -->
+                <div class="accordion-section bg-gradient-panel">
+                    <div class="accordion-header" data-section="section5">
+                        <div class="accordion-header-content">
+                            <span class="text-2xl">⚙️</span>
+                            <span class="font-semibold text-blue-900">Base gcode upload</span>
+                            <span class="accordion-badge badge-step">Step 1</span>
+                        </div>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="control-group">
+                            <label class="block text-sm font-medium text-blue-900 mb-1">Base G-code template</label>
+                            <input
+                                type="file"
+                                id="gcodeTemplate"
+                                accept=".gcode"
+                                class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                            <p class="text-[10px] text-blue-600 mt-1">
+                                Upload a G-code file with a small cube (1x1x0,2mm) to use your starting and ending settings.
+                            </p>
+                        </div>
+                    </div>
+                </div>
                 <!-- SECTION 1: Image Upload -->
                 <div class="accordion-section bg-gradient-panel">
                     <div class="accordion-header active" data-section="section1">
                         <div class="accordion-header-content">
                             <span class="text-2xl">📸</span>
-                            <span class="font-semibold text-blue-900">1. Image Upload</span>
-                            <span class="accordion-badge badge-step">Step 1</span>
+                            <span class="font-semibold text-blue-900">Image Upload</span>
+                            <span class="accordion-badge badge-step">Step 2</span>
                         </div>
                         <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
@@ -262,7 +288,7 @@
                     <div class="accordion-header" data-section="section2">
                         <div class="accordion-header-content">
                             <span class="text-2xl">🔧</span>
-                            <span class="font-semibold text-blue-900">2. Print Parameters</span>
+                            <span class="font-semibold text-blue-900">Print Parameters</span>
                             <span class="accordion-badge badge-optional">Optional</span>
                         </div>
                         <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
@@ -290,8 +316,8 @@
                     <div class="accordion-header" data-section="section3">
                         <div class="accordion-header-content">
                             <span class="text-2xl">✨</span>
-                            <span class="font-semibold text-blue-900">3. Lines & Effects</span>
-                            <span class="accordion-badge badge-advanced">Advanced</span>
+                            <span class="font-semibold text-blue-900">Lines & Effects</span>
+                            <span class="accordion-badge badge-step">Step 3</span>
                         </div>
                         <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
@@ -403,7 +429,7 @@
                     <div class="accordion-header" data-section="section4">
                         <div class="accordion-header-content">
                             <span class="text-2xl">🏗️</span>
-                            <span class="font-semibold text-blue-900">4. Base (optional)</span>
+                            <span class="font-semibold text-blue-900">Base (optional)</span>
                             <span class="accordion-badge badge-optional">Optional</span>
                         </div>
                         <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
@@ -510,40 +536,26 @@
                 </div>
 
                 <!-- SECTION 5: Advanced Options -->
-                <div class="accordion-section bg-gradient-panel">
-                    <div class="accordion-header" data-section="section5">
-                        <div class="accordion-header-content">
-                            <span class="text-2xl">⚙️</span>
-                            <span class="font-semibold text-blue-900">Advanced Options</span>
-                            <span class="accordion-badge badge-advanced">Advanced</span>
-                        </div>
-                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                    <div class="accordion-content">
-                        <div class="control-group">
-                            <label class="block text-sm font-medium text-blue-900 mb-1">Use G-code template (optional)</label>
-                            <input
-                                type="file"
-                                id="gcodeTemplate"
-                                accept=".gcode"
-                                class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                            <p class="text-[10px] text-blue-600 mt-1">
-                                Upload a G-code file with a small cube (1x1x0,2mm) to use your starting and ending settings.
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                
 
-                <div
-                    id="stats"
-                    class="stats hidden mt-4 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 text-blue-900 text-sm"></div>
+                <div id="stats" class="stats hidden mt-4 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 text-blue-900 text-sm"></div>
+                <form action="https://www.paypal.com/donate" method="post" target="_top" class="col-span-full flex justify-center mt-4">
+                <input type="hidden" name="business" value="34JJ7YWBQ6PGA" />
+                <input type="hidden" name="no_recurring" value="0" />
+                <input type="hidden" name="currency_code" value="EUR" />
+                <input
+                    type="image"
+                    src="https://www.paypalobjects.com/en_US/IT/i/btn/btn_donateCC_LG.gif"
+                    border="0"
+                    name="submit"
+                    title="PayPal - The safer, easier way to pay online!"
+                    alt="Donate with PayPal button" />
+                <img alt="" border="0" src="https://www.paypal.com/en_IT/i/scr/pixel.gif" width="1" height="1" />
+            </form>
             </div>
 
             <!-- Right panel: preview -->
-            <div
-                class="bg-gradient-panel rounded-xl shadow-lg p-6 text-center preview-container border border-blue-100/60">
+            <div class="bg-gradient-panel rounded-xl shadow-lg p-6 text-center preview-container border border-blue-100/60">
                 <h3 class="text-lg font-semibold text-blue-900 border-b border-blue-200 pb-2 mb-3">Path Preview</h3>
                 <div
                     class="rounded-r-lg border-l-4 border-blue-500 bg-gradient-info text-blue-900 px-4 py-3 text-sm mb-4 text-left shadow-sm">
@@ -563,23 +575,6 @@
                 </div>
             </div>
 
-            <form
-                action="https://www.paypal.com/donate"
-                method="post"
-                target="_top"
-                class="col-span-full flex justify-center mt-4">
-                <input type="hidden" name="business" value="34JJ7YWBQ6PGA" />
-                <input type="hidden" name="no_recurring" value="0" />
-                <input type="hidden" name="currency_code" value="EUR" />
-                <input
-                    type="image"
-                    src="https://www.paypalobjects.com/en_US/IT/i/btn/btn_donateCC_LG.gif"
-                    border="0"
-                    name="submit"
-                    title="PayPal - The safer, easier way to pay online!"
-                    alt="Donate with PayPal button" />
-                <img alt="" border="0" src="https://www.paypal.com/en_IT/i/scr/pixel.gif" width="1" height="1" />
-            </form>
         </div>
 
         <canvas id="hiddenCanvas" class="hidden"></canvas>
