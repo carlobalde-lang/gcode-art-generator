@@ -1,29 +1,4 @@
 "use strict";
-
-/**
- * =====================================================
- * G-CODE ART GENERATOR - ADAPTIVE BASE VERSION
- * =====================================================
- * 
- * NEW FEATURE:
- * - 🎯 ADAPTIVE BASE: Shape adapts to path type!
- *   - Spiral → Circular base
- *   - Square Spiral / Hilbert → Square base
- *   - Zigzag / Diagonal → Rectangular base
- * 
- * Other improvements:
- * - ✅ All null checks on DOM elements
- * - ✅ Complete input validation
- * - ✅ Error handling with try-catch
- * - ✅ Memory leak prevention
- * - ✅ Loading indicators
- * - ✅ Toast notifications instead of alert()
- * - ✅ Debouncing on inputs
- * - ✅ File size validation
- * - ✅ Infinite loop prevention
- * - ✅ Performance optimizations
- */
-
 // ==================== CONSTANTS ====================
 
 const TWO_PI = 2 * Math.PI;
@@ -1526,7 +1501,7 @@ function processImageCore() {
         let cy = offsetY + printHeight / 2;
         let radius = 0.0;
         let angle = 0;
-        const maxRadius = addCircularBase ? innerRadius : printDim / 2;
+        const maxRadius = addCircularBase ? (baseRadius - innerRadius) : printDim / 2;
         
         let iterations = 0;
         while (radius < maxRadius && iterations < MAX_LOOP_ITERATIONS) {
