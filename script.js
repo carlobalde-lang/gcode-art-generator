@@ -1,10 +1,268 @@
 "use strict";
-// --- MATHEMATICAL CONSTANTS & UTILITIES ---
+
+/**
+ * =====================================================
+ * G-CODE ART GENERATOR - ADAPTIVE BASE VERSION
+ * =====================================================
+ * 
+ * NEW FEATURE:
+ * - 🎯 ADAPTIVE BASE: Shape adapts to path type!
+ *   - Spiral → Circular base
+ *   - Square Spiral / Hilbert → Square base
+ *   - Zigzag / Diagonal → Rectangular base
+ * 
+ * Other improvements:
+ * - ✅ All null checks on DOM elements
+ * - ✅ Complete input validation
+ * - ✅ Error handling with try-catch
+ * - ✅ Memory leak prevention
+ * - ✅ Loading indicators
+ * - ✅ Toast notifications instead of alert()
+ * - ✅ Debouncing on inputs
+ * - ✅ File size validation
+ * - ✅ Infinite loop prevention
+ * - ✅ Performance optimizations
+ */
+
+// ==================== CONSTANTS ====================
+
 const TWO_PI = 2 * Math.PI;
-// Hilbert Curve (Base 2)
+const PREVIEW_SCALE = 3;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_TEMPLATE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_LOOP_ITERATIONS = 100000;
+const ZOOM_MIN = 1.0;
+const ZOOM_MAX = 10.0;
+const ZOOM_FACTOR = 1.1;
+
+// ==================== UTILITY FUNCTIONS ====================
+
+/**
+ * Safely parse float with validation
+ */
+function safeParseFloat(value, defaultValue, min = -Infinity, max = Infinity) {
+    const parsed = parseFloat(value);
+    if (isNaN(parsed) || !isFinite(parsed)) {
+        return defaultValue;
+    }
+    return Math.max(min, Math.min(max, parsed));
+}
+
+/**
+ * Safely parse integer with validation
+ */
+function safeParseInt(value, defaultValue, min = -Infinity, max = Infinity) {
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || !isFinite(parsed)) {
+        return defaultValue;
+    }
+    return Math.max(min, Math.min(max, parsed));
+}
+
+/**
+ * Safely get element by ID
+ */
+function getElement(id) {
+    const element = document.getElementById(id);
+    if (!element) {
+        console.warn(`Element not found: ${id}`);
+    }
+    return element;
+}
+
+/**
+ * Debounce function for input handlers
+ */
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+/**
+ * Show error toast notification
+ */
+function showErrorMessage(message) {
+    const existingToast = document.querySelector('.error-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'error-toast';
+    toast.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+            z-index: 9999;
+            max-width: 400px;
+            animation: slideIn 0.3s ease;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 14px;
+        ">
+            <strong>⚠️ Error</strong><br>${message}
+        </div>
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .error-toast.fade-out {
+            animation: fadeOut 0.3s ease forwards;
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateX(400px); }
+        }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => {
+            toast.remove();
+            style.remove();
+        }, 300);
+    }, 5000);
+}
+
+/**
+ * Show loading spinner
+ */
+function showLoadingSpinner() {
+    const existingSpinner = document.querySelector('.loading-spinner');
+    if (existingSpinner) return;
+
+    const spinner = document.createElement('div');
+    spinner.className = 'loading-spinner';
+    spinner.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(4px);
+        ">
+            <div style="
+                background: white;
+                padding: 32px;
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                text-align: center;
+            ">
+                <div style="
+                    width: 48px;
+                    height: 48px;
+                    border: 4px solid #e5e7eb;
+                    border-top-color: #2563eb;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 16px;
+                "></div>
+                <div style="color: #1e3a5f; font-weight: 600; font-family: 'Segoe UI', sans-serif;">
+                    Generating G-code...
+                </div>
+            </div>
+        </div>
+    `;
+
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+    document.body.appendChild(spinner);
+}
+
+/**
+ * Hide loading spinner
+ */
+function hideLoadingSpinner() {
+    const spinner = document.querySelector('.loading-spinner');
+    if (spinner) spinner.remove();
+}
+
+// ==================== GLOBAL STATE ====================
+
+const appState = {
+    originalImage: null,
+    originalImageRatio: 1.0,
+    gcodeContent: "",
+    gcodeTemplateContent: null,
+    cachedPixels: null,
+    cachedDimensions: null,
+    imageOffsetX: 0.0,
+    imageOffsetY: 0.0,
+    imageZoom: 1.0,
+    isDragging: false,
+    lastMouseX: 0,
+    lastMouseY: 0,
+    threeScene: null,
+    threeCamera: null,
+    threeRenderer: null,
+    threeMesh: null,
+    threeAnimating: false,
+    threeOrbitRadius: 200,
+    threeOrbitTheta: -Math.PI / 4,
+    threeOrbitPhi: Math.PI / 4,
+    threeOrbitDragging: false,
+    threePanDragging: false,
+    threeOrbitLastX: 0,
+    threeOrbitLastY: 0,
+    threeTarget: null
+};
+
+// Initialize Three.js vector if available
+if (typeof THREE !== 'undefined') {
+    appState.threeTarget = new THREE.Vector3(0, 0, 0);
+}
+
+// ==================== DOM REFERENCES ====================
+
+const imageInput = getElement("imageInput");
+const hiddenCanvas = getElement("hiddenCanvas");
+const previewCanvas = getElement("previewCanvas");
+const printWidthInput = getElement("printWidth");
+const printHeightInput = getElement("printHeight");
+
+// Canvas contexts with null checks
+let ctx = null;
+let previewCtx = null;
+
+if (hiddenCanvas) {
+    ctx = hiddenCanvas.getContext("2d");
+    if (!ctx) {
+        console.error("Failed to get 2D context for hidden canvas");
+    }
+}
+
+if (previewCanvas) {
+    previewCtx = previewCanvas.getContext("2d");
+    if (!previewCtx) {
+        console.error("Failed to get 2D context for preview canvas");
+    }
+}
+
+// ==================== MATHEMATICAL FUNCTIONS ====================
+
+/**
+ * Hilbert Curve algorithm
+ */
 function hilbert(order, d) {
-    let x = 0,
-        y = 0;
+    let x = 0, y = 0;
     let rx, ry, s;
     let t = d;
     const n = 1 << order;
@@ -18,7 +276,7 @@ function hilbert(order, d) {
                 x = s - 1 - x;
                 y = s - 1 - y;
             }
-            [x, y] = [y, x]; // Swap x and y
+            [x, y] = [y, x];
         }
         x += s * rx;
         y += s * ry;
@@ -27,282 +285,110 @@ function hilbert(order, d) {
     return { x: x, y: y };
 }
 
-// --- GLOBAL VARIABLES & DOM REFERENCES ---
-const baseSpeedSlider = document.getElementById("baseSpeed");
-const baseSpeedVal = document.getElementById("baseSpeedVal");
+// ==================== CLEANUP FUNCTIONS ====================
 
-if (baseSpeedSlider && baseSpeedVal) {
-    baseSpeedSlider.addEventListener("input", (e) => {
-        baseSpeedVal.innerText = e.target.value;
-    });
+/**
+ * Cleanup function to prevent memory leaks
+ */
+function cleanup() {
+    if (appState.originalImage) {
+        appState.originalImage.src = '';
+        appState.originalImage = null;
+    }
+    
+    appState.cachedPixels = null;
+    appState.cachedDimensions = null;
 }
 
-// Gestione visibilità AMS
-document.getElementById("filamentChangeMode").addEventListener("change", function (e) {
-    const amsContainer = document.getElementById("amsSlotContainer");
-    if (e.target.value === "ams") {
-        amsContainer.classList.remove("hidden");
-    } else {
-        amsContainer.classList.add("hidden");
-    }
-});
-let gcodeContent = "";
-let originalImage = null;
-let originalImageRatio = 1.0;
-let gcodeTemplateContent = null;
-document.getElementById("gcodeTemplate").addEventListener("change", function (e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function (event) {
-        gcodeTemplateContent = event.target.result;
-        console.log("G-code uploaded!");
-    };
-    reader.readAsText(file);
-});
-// 3D preview globals
-let threeScene = null;
-let threeCamera = null;
-let threeRenderer = null;
-let threeMesh = null;
-let threeAnimating = false;
-let threeOrbitRadius = 200;
-let threeOrbitTheta = -Math.PI / 4;
-let threeOrbitPhi = Math.PI / 4;
-let threeOrbitDragging = false;
-let threePanDragging = false;
-let threeOrbitLastX = 0;
-let threeOrbitLastY = 0;
-let threeTarget = new THREE.Vector3(0, 0, 0);
+// ==================== IMAGE HANDLING ====================
 
-const imageInput = document.getElementById("imageInput");
-const hiddenCanvas = document.getElementById("hiddenCanvas");
-const ctx = hiddenCanvas.getContext("2d");
-const previewCanvas = document.getElementById("previewCanvas");
-const previewCtx = previewCanvas.getContext("2d");
-const printWidthInput = document.getElementById("printWidth");
-const printHeightInput = document.getElementById("printHeight");
-
-// Pan & Zoom State Variables
-const PREVIEW_SCALE = 3;
-let imageOffsetX = 0.0;
-let imageOffsetY = 0.0;
-let imageZoom = 1.0;
-let isDragging = false;
-let lastMouseX = 0;
-let lastMouseY = 0;
-
-// --- PROPORTIONAL LOGIC ---
+/**
+ * Update print height from width (proportional)
+ */
 function updatePrintHeightFromWidth(newWidth) {
-    if (originalImage) {
-        printHeightInput.value = (newWidth / originalImageRatio).toFixed(2);
+    if (appState.originalImage && printHeightInput) {
+        printHeightInput.value = (newWidth / appState.originalImageRatio).toFixed(2);
     }
 }
 
+/**
+ * Update print width from height (proportional)
+ */
 function updatePrintWidthFromHeight(newHeight) {
-    if (originalImage) {
-        printWidthInput.value = (newHeight * originalImageRatio).toFixed(2);
+    if (appState.originalImage && printWidthInput) {
+        printWidthInput.value = (newHeight * appState.originalImageRatio).toFixed(2);
     }
 }
 
-printWidthInput.addEventListener("input", () => {
-    updatePrintHeightFromWidth(parseFloat(printWidthInput.value));
-});
-printHeightInput.addEventListener("input", () => {
-    updatePrintWidthFromHeight(parseFloat(printHeightInput.value));
-});
-
+/**
+ * Draw image slice preview on canvas
+ */
 function drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight) {
-    if (!originalImage) return;
+    if (!appState.originalImage || !previewCtx) return;
 
-    // 1. Clear and setup Canvas (Y-up for G-code visual alignment)
-    previewCtx.setTransform(1, 0, 0, 1, 0, 0);
-    previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    try {
+        previewCtx.setTransform(1, 0, 0, 1, 0, 0);
+        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
-    previewCtx.translate(0, previewCanvas.height);
-    previewCtx.scale(PREVIEW_SCALE, -PREVIEW_SCALE);
+        previewCtx.translate(0, previewCanvas.height);
+        previewCtx.scale(PREVIEW_SCALE, -PREVIEW_SCALE);
 
-    // 2. Draw Bed Boundary
-    previewCtx.strokeStyle = "#cbd5e1";
-    previewCtx.lineWidth = 1;
-    previewCtx.strokeRect(0, 0, bedSize, bedSize);
+        // Draw bed boundary
+        previewCtx.strokeStyle = "#cbd5e1";
+        previewCtx.lineWidth = 1;
+        previewCtx.strokeRect(0, 0, bedSize, bedSize);
 
-    const hideImageOverlayChecked = document.getElementById("hideImageOverlay").checked;
+        const hideImageOverlay = getElement("hideImageOverlay");
+        const hideImageOverlayChecked = hideImageOverlay ? hideImageOverlay.checked : false;
 
-    if (hideImageOverlayChecked) {
-        const sX_norm = imageOffsetX;
-        const sY_norm = imageOffsetY;
-        const sW_norm = 1.0 / imageZoom;
-        const sH_norm = 1.0 / imageZoom;
+        if (hideImageOverlayChecked) {
+            const sX_norm = appState.imageOffsetX;
+            const sY_norm = appState.imageOffsetY;
+            const sW_norm = 1.0 / appState.imageZoom;
+            const sH_norm = 1.0 / appState.imageZoom;
 
-        previewCtx.save();
-        previewCtx.translate(offsetX, offsetY);
-        previewCtx.scale(1, -1);
-        previewCtx.translate(0, -printHeight);
+            previewCtx.save();
+            previewCtx.translate(offsetX, offsetY);
+            previewCtx.scale(1, -1);
+            previewCtx.translate(0, -printHeight);
 
-        const mirrorimage = document.getElementById("mirrorimage").checked;
-        if (mirrorimage) {
-            previewCtx.translate(printWidth, 0);
-            previewCtx.scale(-1, 1);
+            const mirrorImage = getElement("mirrorimage");
+            const mirrorChecked = mirrorImage ? mirrorImage.checked : false;
+            
+            if (mirrorChecked) {
+                previewCtx.translate(printWidth, 0);
+                previewCtx.scale(-1, 1);
+            }
+
+            previewCtx.drawImage(
+                appState.originalImage,
+                appState.originalImage.width * sX_norm,
+                appState.originalImage.height * sY_norm,
+                appState.originalImage.width * sW_norm,
+                appState.originalImage.height * sH_norm,
+                0, 0,
+                printWidth, printHeight
+            );
+
+            previewCtx.restore();
         }
 
-        previewCtx.drawImage(
-            originalImage,
-            originalImage.width * sX_norm,
-            originalImage.height * sY_norm,
-            originalImage.width * sW_norm,
-            originalImage.height * sH_norm,
-            0,
-            0,
-            printWidth,
-            printHeight
-        );
-
-        previewCtx.restore();
+        previewCtx.strokeStyle = "#ef4444";
+        previewCtx.lineWidth = 1;
+        previewCtx.strokeRect(offsetX, offsetY, printWidth, printHeight);
+    } catch (error) {
+        console.error("Error drawing preview:", error);
     }
-
-    previewCtx.strokeStyle = "#ef4444";
-    previewCtx.lineWidth = 1;
-    previewCtx.strokeRect(offsetX, offsetY, printWidth, printHeight);
 }
 
-// --- IMAGE MANIPULATION HANDLERS (Pan & Zoom) ---
-function setupImageManipulationHandlers() {
-    const pC = previewCanvas;
-
-    const getPrintParams = () => {
-        const bedSize = parseFloat(document.getElementById("bedSize").value) || 250;
-        const printWidth = parseFloat(printWidthInput.value) || 100;
-        const printHeight = parseFloat(printHeightInput.value) || 100;
-        const offsetX = (bedSize - printWidth) / 2;
-        const offsetY = (bedSize - printHeight) / 2;
-        return { bedSize, printWidth, printHeight, offsetX, offsetY };
-    };
-
-    pC.addEventListener("mousedown", (e) => {
-        if (!originalImage) return;
-        isDragging = true;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-        pC.style.cursor = "grabbing";
-    });
-
-    document.addEventListener("mouseup", () => {
-        isDragging = false;
-        pC.style.cursor = "grab";
-    });
-
-    pC.addEventListener("mousemove", (e) => {
-        if (!isDragging || !originalImage) return;
-
-        const { bedSize, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
-
-        const dx = e.clientX - lastMouseX;
-        const dy = e.clientY - lastMouseY;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-
-        const areaWidthOnScreen = printWidth * PREVIEW_SCALE;
-        const areaHeightOnScreen = printHeight * PREVIEW_SCALE;
-
-        const uvDeltaX = dx / areaWidthOnScreen;
-        const uvDeltaY = dy / areaHeightOnScreen;
-
-        imageOffsetX -= uvDeltaX / imageZoom;
-        imageOffsetY += uvDeltaY / imageZoom;
-
-        const maxOffset = 1 - 1 / imageZoom;
-        imageOffsetX = Math.max(0, Math.min(maxOffset, imageOffsetX));
-        imageOffsetY = Math.max(0, Math.min(maxOffset, imageOffsetY));
-
-        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
-    });
-
-    pC.addEventListener(
-        "wheel",
-        (e) => {
-            if (!originalImage) return;
-            e.preventDefault();
-
-            const { bedSize, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
-
-            const rect = pC.getBoundingClientRect();
-            const mouseX_mm = (e.clientX - rect.left) / PREVIEW_SCALE;
-            const mouseY_mm = (pC.height - (e.clientY - rect.top)) / PREVIEW_SCALE;
-
-            const u_print = (mouseX_mm - offsetX) / printWidth;
-            const v_print = (mouseY_mm - offsetY) / printHeight;
-
-            const u_clamped = Math.max(0, Math.min(1, u_print));
-            const v_clamped = Math.max(0, Math.min(1, v_print));
-
-            const v_print_ydown = 1.0 - v_clamped;
-
-            const u_source_old = u_clamped / imageZoom + imageOffsetX;
-            const v_source_old = v_print_ydown / imageZoom + imageOffsetY;
-
-            const zoomDelta = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-            let newZoom = imageZoom * zoomDelta;
-
-            imageZoom = Math.max(1.0, Math.min(10.0, newZoom));
-
-            let newOffsetX = u_source_old - u_clamped / imageZoom;
-            let newOffsetY = v_source_old - v_print_ydown / imageZoom;
-
-            const maxOffset = 1 - 1 / imageZoom;
-            newOffsetX = Math.max(0, Math.min(maxOffset, newOffsetX));
-            newOffsetY = Math.max(0, Math.min(maxOffset, newOffsetY));
-
-            imageOffsetX = newOffsetX;
-            imageOffsetY = newOffsetY;
-
-            drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
-        },
-        { passive: false }
-    );
-}
-
-// --- IMAGE LOADING EVENT LISTENER ---
-imageInput.addEventListener("change", function (e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function (event) {
-        originalImage = new Image();
-        originalImage.onload = function () {
-            originalImageRatio = originalImage.width / originalImage.height;
-
-            document.getElementById("imageRatioInfo").innerText =
-                `Image Ratio: ${originalImage.width}x${originalImage.height}px (X/Y Ratio: ${originalImageRatio.toFixed(2)}:1)`;
-
-            updatePrintHeightFromWidth(parseFloat(printWidthInput.value));
-
-            imageZoom = 1.0;
-            imageOffsetX = 0.0;
-            imageOffsetY = 0.0;
-
-            const bedSize = parseFloat(document.getElementById("bedSize").value) || 250;
-            previewCanvas.width = bedSize * PREVIEW_SCALE;
-            previewCanvas.height = bedSize * PREVIEW_SCALE;
-
-            const printWidth = parseFloat(printWidthInput.value) || 100;
-            const printHeight = parseFloat(printHeightInput.value) || 100;
-            const offsetX = (bedSize - printWidth) / 2;
-            const offsetY = (bedSize - printHeight) / 2;
-            drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
-        };
-        originalImage.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-});
-
-// --- BRIGHTNESS FUNCTION WITH GAMMA (OPTIMIZED) ---
+/**
+ * Get brightness at UV coordinates with gamma correction
+ */
 function getBrightnessAtUV(u_print, v_print_yup, pixels, anaW, anaH, gammaVal) {
     const v_print_ydown = 1.0 - v_print_yup;
 
-    let u_source = u_print / imageZoom + imageOffsetX;
-    let v_source = v_print_ydown / imageZoom + imageOffsetY;
+    let u_source = u_print / appState.imageZoom + appState.imageOffsetX;
+    let v_source = v_print_ydown / appState.imageZoom + appState.imageOffsetY;
 
     u_source = Math.max(0, Math.min(1, u_source));
     v_source = Math.max(0, Math.min(1, v_source));
@@ -320,70 +406,739 @@ function getBrightnessAtUV(u_print, v_print_yup, pixels, anaW, anaH, gammaVal) {
     return 1.0 - val;
 }
 
-// --- MAIN PROCESS ---
+// ==================== IMAGE MANIPULATION HANDLERS ====================
+
+/**
+ * Setup pan and zoom handlers for preview canvas
+ */
+function setupImageManipulationHandlers() {
+    if (!previewCanvas) return;
+
+    const getPrintParams = () => {
+        const bedSizeElem = getElement("bedSize");
+        const bedSize = safeParseFloat(bedSizeElem?.value, 250, 50, 500);
+        const printWidth = safeParseFloat(printWidthInput?.value, 100, 1, bedSize);
+        const printHeight = safeParseFloat(printHeightInput?.value, 100, 1, bedSize);
+        const offsetX = (bedSize - printWidth) / 2;
+        const offsetY = (bedSize - printHeight) / 2;
+        return { bedSize, printWidth, printHeight, offsetX, offsetY };
+    };
+
+    previewCanvas.addEventListener("mousedown", (e) => {
+        if (!appState.originalImage) return;
+        appState.isDragging = true;
+        appState.lastMouseX = e.clientX;
+        appState.lastMouseY = e.clientY;
+        previewCanvas.style.cursor = "grabbing";
+    });
+
+    document.addEventListener("mouseup", () => {
+        appState.isDragging = false;
+        if (previewCanvas) {
+            previewCanvas.style.cursor = "grab";
+        }
+    });
+
+    previewCanvas.addEventListener("mousemove", (e) => {
+        if (!appState.isDragging || !appState.originalImage) return;
+
+        const { bedSize, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
+
+        const dx = e.clientX - appState.lastMouseX;
+        const dy = e.clientY - appState.lastMouseY;
+        appState.lastMouseX = e.clientX;
+        appState.lastMouseY = e.clientY;
+
+        const areaWidthOnScreen = printWidth * PREVIEW_SCALE;
+        const areaHeightOnScreen = printHeight * PREVIEW_SCALE;
+
+        const uvDeltaX = dx / areaWidthOnScreen;
+        const uvDeltaY = dy / areaHeightOnScreen;
+
+        appState.imageOffsetX -= uvDeltaX / appState.imageZoom;
+        appState.imageOffsetY += uvDeltaY / appState.imageZoom;
+
+        const maxOffset = 1 - 1 / appState.imageZoom;
+        appState.imageOffsetX = Math.max(0, Math.min(maxOffset, appState.imageOffsetX));
+        appState.imageOffsetY = Math.max(0, Math.min(maxOffset, appState.imageOffsetY));
+
+        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+    });
+
+    previewCanvas.addEventListener("wheel", (e) => {
+        if (!appState.originalImage) return;
+        e.preventDefault();
+
+        const { bedSize, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
+
+        const rect = previewCanvas.getBoundingClientRect();
+        const mouseX_mm = (e.clientX - rect.left) / PREVIEW_SCALE;
+        const mouseY_mm = (previewCanvas.height - (e.clientY - rect.top)) / PREVIEW_SCALE;
+
+        const u_print = (mouseX_mm - offsetX) / printWidth;
+        const v_print = (mouseY_mm - offsetY) / printHeight;
+
+        const u_clamped = Math.max(0, Math.min(1, u_print));
+        const v_clamped = Math.max(0, Math.min(1, v_print));
+
+        const v_print_ydown = 1.0 - v_clamped;
+
+        const u_source_old = u_clamped / appState.imageZoom + appState.imageOffsetX;
+        const v_source_old = v_print_ydown / appState.imageZoom + appState.imageOffsetY;
+
+        const zoomDelta = e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR;
+        let newZoom = appState.imageZoom * zoomDelta;
+
+        appState.imageZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+
+        let newOffsetX = u_source_old - u_clamped / appState.imageZoom;
+        let newOffsetY = v_source_old - v_print_ydown / appState.imageZoom;
+
+        const maxOffset = 1 - 1 / appState.imageZoom;
+        newOffsetX = Math.max(0, Math.min(maxOffset, newOffsetX));
+        newOffsetY = Math.max(0, Math.min(maxOffset, newOffsetY));
+
+        appState.imageOffsetX = newOffsetX;
+        appState.imageOffsetY = newOffsetY;
+
+        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+    }, { passive: false });
+}
+
+// ==================== IMAGE INPUT HANDLER ====================
+
+if (imageInput) {
+    imageInput.addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Validate file size
+        if (file.size > MAX_IMAGE_SIZE) {
+            showErrorMessage(`Image too large. Maximum size: ${(MAX_IMAGE_SIZE / 1024 / 1024).toFixed(0)}MB`);
+            e.target.value = '';
+            return;
+        }
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            showErrorMessage("Please select a valid image file");
+            e.target.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        
+        reader.onload = function (event) {
+            // Cleanup old image
+            cleanup();
+            
+            appState.originalImage = new Image();
+            
+            appState.originalImage.onload = function () {
+                try {
+                    appState.originalImageRatio = appState.originalImage.width / appState.originalImage.height;
+                    
+                    const imageRatioInfo = getElement("imageRatioInfo");
+                    if (imageRatioInfo) {
+                        imageRatioInfo.innerText = 
+                            `Image Ratio: ${appState.originalImage.width}×${appState.originalImage.height}px (Ratio: ${appState.originalImageRatio.toFixed(2)}:1)`;
+                    }
+                    
+                    if (printWidthInput) {
+                        updatePrintHeightFromWidth(safeParseFloat(printWidthInput.value, 180));
+                    }
+                    
+                    // Reset zoom and offset
+                    appState.imageZoom = 1.0;
+                    appState.imageOffsetX = 0.0;
+                    appState.imageOffsetY = 0.0;
+                    
+                    // Update preview
+                    const bedSizeElem = getElement("bedSize");
+                    const bedSize = safeParseFloat(bedSizeElem?.value, 250, 50, 500);
+                    
+                    if (previewCanvas) {
+                        previewCanvas.width = bedSize * PREVIEW_SCALE;
+                        previewCanvas.height = bedSize * PREVIEW_SCALE;
+                        
+                        const printWidth = safeParseFloat(printWidthInput?.value, 100);
+                        const printHeight = safeParseFloat(printHeightInput?.value, 100);
+                        const offsetX = (bedSize - printWidth) / 2;
+                        const offsetY = (bedSize - printHeight) / 2;
+                        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+                    }
+                } catch (error) {
+                    console.error("Error processing image:", error);
+                    showErrorMessage("Error loading image. Please try another file.");
+                }
+            };
+            
+            appState.originalImage.onerror = function () {
+                console.error("Image loading error");
+                showErrorMessage("Failed to load image. The file may be corrupted.");
+                e.target.value = '';
+            };
+            
+            appState.originalImage.src = event.target.result;
+        };
+        
+        reader.onerror = function (error) {
+            console.error("File reading error:", error);
+            showErrorMessage("Failed to read image file. Please try again.");
+            e.target.value = '';
+        };
+        
+        reader.readAsDataURL(file);
+    });
+}
+
+// ==================== INPUT EVENT HANDLERS ====================
+
+// Debounced dimension updates
+if (printWidthInput) {
+    printWidthInput.addEventListener("input", debounce(() => {
+        updatePrintHeightFromWidth(safeParseFloat(printWidthInput.value, 100));
+    }, 300));
+}
+
+if (printHeightInput) {
+    printHeightInput.addEventListener("input", debounce(() => {
+        updatePrintWidthFromHeight(safeParseFloat(printHeightInput.value, 100));
+    }, 300));
+}
+
+// Base speed slider
+const baseSpeedSlider = getElement("baseSpeed");
+const baseSpeedVal = getElement("baseSpeedVal");
+
+if (baseSpeedSlider && baseSpeedVal) {
+    baseSpeedSlider.addEventListener("input", (e) => {
+        baseSpeedVal.innerText = e.target.value;
+    });
+}
+
+// Filament change mode
+const filamentChangeMode = getElement("filamentChangeMode");
+if (filamentChangeMode) {
+    filamentChangeMode.addEventListener("change", function (e) {
+        const amsContainer = getElement("amsSlotContainer");
+        if (amsContainer) {
+            if (e.target.value === "ams") {
+                amsContainer.classList.remove("hidden");
+            } else {
+                amsContainer.classList.add("hidden");
+            }
+        }
+    });
+}
+
+// G-code template upload
+const gcodeTemplate = getElement("gcodeTemplate");
+if (gcodeTemplate) {
+    gcodeTemplate.addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        if (file.size > MAX_TEMPLATE_SIZE) {
+            showErrorMessage(`Template file too large. Maximum size: ${(MAX_TEMPLATE_SIZE / 1024 / 1024).toFixed(0)}MB`);
+            e.target.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        
+        reader.onload = function (event) {
+            appState.gcodeTemplateContent = event.target.result;
+            console.log("G-code template loaded successfully");
+        };
+        
+        reader.onerror = function (error) {
+            console.error("File reading error:", error);
+            showErrorMessage("Failed to load template file. Please try again.");
+            e.target.value = '';
+        };
+        
+        reader.readAsText(file);
+    });
+}
+
+// ==================== BASE GENERATION FUNCTIONS ====================
+
+/**
+ * Generate circular base (for spiral path)
+ */
+function generateCircularBase(params) {
+    const { gcode, baseLayers, zOffset, layerHeight, baseRadius, baseMargin, 
+            centerX, centerY, baseSpeed, filArea } = params;
+    
+    const baseOverlap = 0.45;
+    const wallSpacing = 0.42;
+    const numWalls = 3;
+    const BASE_LINE_WIDTH = 0.5;
+    
+    let prevX = params.prevX;
+    let prevY = params.prevY;
+    
+    function writeBaseSegment(x, y, customSpeed = baseSpeed) {
+        const dist = Math.hypot(x - prevX, y - prevY);
+        if (dist < 0.01) return;
+        const vol = dist * BASE_LINE_WIDTH * layerHeight;
+        const e = vol / filArea;
+        gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(5)} F${customSpeed.toFixed(0)}`);
+        params.totalE += e;
+        prevX = x;
+        prevY = y;
+    }
+    
+    gcode.push(`; --- Circular Base (Adaptive) ---`);
+    
+    for (let layer = 0; layer < baseLayers; layer++) {
+        const z = zOffset + layer * layerHeight;
+        gcode.push(`G1 Z${z.toFixed(3)} F1000 ; Base layer ${layer + 1}/${baseLayers}`);
+        
+        // Circular walls
+        for (let w = 0; w < numWalls; w++) {
+            const currentWallRadius = baseRadius - w * wallSpacing;
+            const numPoints = Math.max(60, Math.ceil((TWO_PI * currentWallRadius) / 0.5));
+            const dAngle = TWO_PI / numPoints;
+            const startX = centerX + currentWallRadius;
+            const startY = centerY;
+            
+            gcode.push(`G0 X${startX.toFixed(3)} Y${startY.toFixed(3)} F6000`);
+            prevX = startX;
+            prevY = startY;
+            
+            for (let i = 1; i <= numPoints; i++) {
+                const angle = i * dAngle;
+                const x = centerX + currentWallRadius * Math.cos(angle);
+                const y = centerY + currentWallRadius * Math.sin(angle);
+                writeBaseSegment(x, y);
+            }
+        }
+        
+        gcode.push(`G1 E-0.8 F3000`);
+        gcode.push(`G0 Z${(z + 0.4).toFixed(3)} F6000`);
+        
+        // Circular infill
+        let goingRight = true;
+        const fillLimitRadius = baseRadius - numWalls * wallSpacing;
+        const infillTotalHeight = fillLimitRadius * 2;
+        
+        for (let yRel = -fillLimitRadius; yRel <= fillLimitRadius; yRel += baseOverlap) {
+            const xLimit = Math.sqrt(Math.max(0, Math.pow(fillLimitRadius, 2) - Math.pow(yRel, 2)));
+            const xLeft = centerX - xLimit;
+            const xRight = centerX + xLimit;
+            const currentY = centerY + yRel;
+            
+            let currentSpeed = baseSpeed;
+            if (yRel < -fillLimitRadius + infillTotalHeight * 0.1) {
+                currentSpeed = baseSpeed * 0.5;
+            }
+            
+            if (goingRight) {
+                if (yRel === -fillLimitRadius || Math.abs(yRel + fillLimitRadius) < 0.01) {
+                    gcode.push(`G0 X${xLeft.toFixed(3)} Y${currentY.toFixed(3)} F6000`);
+                    gcode.push(`G1 Z${z.toFixed(3)} F1000`);
+                    gcode.push(`G1 E0.9 F3000`);
+                    prevX = xLeft;
+                    prevY = currentY;
+                } else {
+                    writeBaseSegment(xLeft, currentY, currentSpeed);
+                }
+                writeBaseSegment(xRight - 0.1, currentY, currentSpeed);
+            } else {
+                writeBaseSegment(xRight, currentY, currentSpeed);
+                writeBaseSegment(xLeft + 0.1, currentY, currentSpeed);
+            }
+            goingRight = !goingRight;
+        }
+        gcode.push(`G0 Z${(z + 0.5).toFixed(3)} F6000`);
+    }
+    
+    params.prevX = prevX;
+    params.prevY = prevY;
+    
+    return baseMargin;
+}
+
+/**
+ * Generate square base (for square spiral and hilbert)
+ */
+function generateSquareBase(params) {
+    const { gcode, baseLayers, zOffset, layerHeight, printDim, baseMargin,
+            centerOffset, baseSpeed, filArea } = params;
+    
+    const baseOverlap = 0.45;
+    const wallSpacing = 0.42;
+    const numWalls = 3;
+    const BASE_LINE_WIDTH = 0.5;
+    
+    let prevX = params.prevX;
+    let prevY = params.prevY;
+    
+    function writeBaseSegment(x, y, customSpeed = baseSpeed) {
+        const dist = Math.hypot(x - prevX, y - prevY);
+        if (dist < 0.01) return;
+        const vol = dist * BASE_LINE_WIDTH * layerHeight;
+        const e = vol / filArea;
+        gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(5)} F${customSpeed.toFixed(0)}`);
+        params.totalE += e;
+        prevX = x;
+        prevY = y;
+    }
+    
+    gcode.push(`; --- Square Base (Adaptive) ---`);
+    
+    for (let layer = 0; layer < baseLayers; layer++) {
+        const z = zOffset + layer * layerHeight;
+        gcode.push(`G1 Z${z.toFixed(3)} F1000 ; Base layer ${layer + 1}/${baseLayers}`);
+        
+        // Square walls
+        for (let w = 0; w < numWalls; w++) {
+            const inset = w * wallSpacing;
+            const x0 = centerOffset.x + inset;
+            const y0 = centerOffset.y + inset;
+            const x1 = centerOffset.x + printDim - inset;
+            const y1 = centerOffset.y + printDim - inset;
+            
+            // Move to start
+            gcode.push(`G0 X${x0.toFixed(3)} Y${y0.toFixed(3)} F6000`);
+            prevX = x0;
+            prevY = y0;
+            
+            // Bottom edge (left to right)
+            const bottomSegs = Math.max(2, Math.floor((x1 - x0) / 0.5));
+            for (let i = 1; i <= bottomSegs; i++) {
+                const x = x0 + (x1 - x0) * (i / bottomSegs);
+                writeBaseSegment(x, y0);
+            }
+            
+            // Right edge (bottom to top)
+            const rightSegs = Math.max(2, Math.floor((y1 - y0) / 0.5));
+            for (let i = 1; i <= rightSegs; i++) {
+                const y = y0 + (y1 - y0) * (i / rightSegs);
+                writeBaseSegment(x1, y);
+            }
+            
+            // Top edge (right to left)
+            for (let i = 1; i <= bottomSegs; i++) {
+                const x = x1 - (x1 - x0) * (i / bottomSegs);
+                writeBaseSegment(x, y1);
+            }
+            
+            // Left edge (top to bottom, except last point to avoid overlap)
+            for (let i = 1; i < rightSegs; i++) {
+                const y = y1 - (y1 - y0) * (i / rightSegs);
+                writeBaseSegment(x0, y);
+            }
+        }
+        
+        gcode.push(`G1 E-0.8 F3000`);
+        gcode.push(`G0 Z${(z + 0.4).toFixed(3)} F6000`);
+        
+        // Rectangular infill
+        let goingRight = true;
+        const innerMargin = numWalls * wallSpacing;
+        const fillX0 = centerOffset.x + innerMargin;
+        const fillY0 = centerOffset.y + innerMargin;
+        const fillX1 = centerOffset.x + printDim - innerMargin;
+        const fillY1 = centerOffset.y + printDim - innerMargin;
+        const fillHeight = fillY1 - fillY0;
+        
+        for (let yRel = fillY0; yRel <= fillY1; yRel += baseOverlap) {
+            let currentSpeed = baseSpeed;
+            if ((yRel - fillY0) < fillHeight * 0.1) {
+                currentSpeed = baseSpeed * 0.5;
+            }
+            
+            if (goingRight) {
+                if (yRel === fillY0) {
+                    gcode.push(`G0 X${fillX0.toFixed(3)} Y${yRel.toFixed(3)} F6000`);
+                    gcode.push(`G1 Z${z.toFixed(3)} F1000`);
+                    gcode.push(`G1 E0.9 F3000`);
+                    prevX = fillX0;
+                    prevY = yRel;
+                } else {
+                    writeBaseSegment(fillX0, yRel, currentSpeed);
+                }
+                writeBaseSegment(fillX1 - 0.1, yRel, currentSpeed);
+            } else {
+                writeBaseSegment(fillX1, yRel, currentSpeed);
+                writeBaseSegment(fillX0 + 0.1, yRel, currentSpeed);
+            }
+            goingRight = !goingRight;
+        }
+        gcode.push(`G0 Z${(z + 0.5).toFixed(3)} F6000`);
+    }
+    
+    params.prevX = prevX;
+    params.prevY = prevY;
+    
+    return baseMargin + numWalls * wallSpacing;
+}
+
+/**
+ * Generate rectangular base (for zigzag and diagonal)
+ */
+function generateRectangularBase(params) {
+    const { gcode, baseLayers, zOffset, layerHeight, printWidth, printHeight, baseMargin,
+            offsetX, offsetY, baseSpeed, filArea } = params;
+    
+    const baseOverlap = 0.45;
+    const wallSpacing = 0.42;
+    const numWalls = 3;
+    const BASE_LINE_WIDTH = 0.5;
+    
+    let prevX = params.prevX;
+    let prevY = params.prevY;
+    
+    function writeBaseSegment(x, y, customSpeed = baseSpeed) {
+        const dist = Math.hypot(x - prevX, y - prevY);
+        if (dist < 0.01) return;
+        const vol = dist * BASE_LINE_WIDTH * layerHeight;
+        const e = vol / filArea;
+        gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(5)} F${customSpeed.toFixed(0)}`);
+        params.totalE += e;
+        prevX = x;
+        prevY = y;
+    }
+    
+    gcode.push(`; --- Rectangular Base (Adaptive) ---`);
+    
+    for (let layer = 0; layer < baseLayers; layer++) {
+        const z = zOffset + layer * layerHeight;
+        gcode.push(`G1 Z${z.toFixed(3)} F1000 ; Base layer ${layer + 1}/${baseLayers}`);
+        
+        // Rectangular walls
+        for (let w = 0; w < numWalls; w++) {
+            const inset = w * wallSpacing;
+            const x0 = offsetX + inset;
+            const y0 = offsetY + inset;
+            const x1 = offsetX + printWidth - inset;
+            const y1 = offsetY + printHeight - inset;
+            
+            // Move to start
+            gcode.push(`G0 X${x0.toFixed(3)} Y${y0.toFixed(3)} F6000`);
+            prevX = x0;
+            prevY = y0;
+            
+            // Bottom edge
+            const bottomSegs = Math.max(2, Math.floor((x1 - x0) / 0.5));
+            for (let i = 1; i <= bottomSegs; i++) {
+                const x = x0 + (x1 - x0) * (i / bottomSegs);
+                writeBaseSegment(x, y0);
+            }
+            
+            // Right edge
+            const rightSegs = Math.max(2, Math.floor((y1 - y0) / 0.5));
+            for (let i = 1; i <= rightSegs; i++) {
+                const y = y0 + (y1 - y0) * (i / rightSegs);
+                writeBaseSegment(x1, y);
+            }
+            
+            // Top edge
+            for (let i = 1; i <= bottomSegs; i++) {
+                const x = x1 - (x1 - x0) * (i / bottomSegs);
+                writeBaseSegment(x, y1);
+            }
+            
+            // Left edge
+            for (let i = 1; i < rightSegs; i++) {
+                const y = y1 - (y1 - y0) * (i / rightSegs);
+                writeBaseSegment(x0, y);
+            }
+        }
+        
+        gcode.push(`G1 E-0.8 F3000`);
+        gcode.push(`G0 Z${(z + 0.4).toFixed(3)} F6000`);
+        
+        // Rectangular infill
+        let goingRight = true;
+        const innerMargin = numWalls * wallSpacing;
+        const fillX0 = offsetX + innerMargin;
+        const fillY0 = offsetY + innerMargin;
+        const fillX1 = offsetX + printWidth - innerMargin;
+        const fillY1 = offsetY + printHeight - innerMargin;
+        const fillHeight = fillY1 - fillY0;
+        
+        for (let yRel = fillY0; yRel <= fillY1; yRel += baseOverlap) {
+            let currentSpeed = baseSpeed;
+            if ((yRel - fillY0) < fillHeight * 0.1) {
+                currentSpeed = baseSpeed * 0.5;
+            }
+            
+            if (goingRight) {
+                if (yRel === fillY0) {
+                    gcode.push(`G0 X${fillX0.toFixed(3)} Y${yRel.toFixed(3)} F6000`);
+                    gcode.push(`G1 Z${z.toFixed(3)} F1000`);
+                    gcode.push(`G1 E0.9 F3000`);
+                    prevX = fillX0;
+                    prevY = yRel;
+                } else {
+                    writeBaseSegment(fillX0, yRel, currentSpeed);
+                }
+                writeBaseSegment(fillX1 - 0.1, yRel, currentSpeed);
+            } else {
+                writeBaseSegment(fillX1, yRel, currentSpeed);
+                writeBaseSegment(fillX0 + 0.1, yRel, currentSpeed);
+            }
+            goingRight = !goingRight;
+        }
+        gcode.push(`G0 Z${(z + 0.5).toFixed(3)} F6000`);
+    }
+    
+    params.prevX = prevX;
+    params.prevY = prevY;
+    
+    return baseMargin + numWalls * wallSpacing;
+}
+
+// ==================== MAIN PROCESS FUNCTION ====================
+
+/**
+ * Main image processing function with all improvements
+ */
 function processImage() {
-    if (!originalImage) {
-        alert("Please upload an image first!");
+    // Validation
+    if (!appState.originalImage) {
+        showErrorMessage("Please upload an image first!");
         return;
     }
+    
+    if (!ctx || !previewCtx) {
+        showErrorMessage("Canvas context not available");
+        return;
+    }
+    
+    const generateBtn = getElement("generateBtn");
+    const downloadBtn = getElement("downloadBtn");
+    
+    // Disable UI during processing
+    if (generateBtn) {
+        generateBtn.disabled = true;
+        generateBtn.textContent = "⏳ Processing...";
+    }
+    if (downloadBtn) {
+        downloadBtn.style.display = "none";
+    }
+    
+    showLoadingSpinner();
+    
+    // Use setTimeout to allow UI update
+    setTimeout(() => {
+        try {
+            processImageCore();
+        } catch (error) {
+            console.error("Processing error:", error);
+            showErrorMessage("An error occurred during processing: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+            if (generateBtn) {
+                generateBtn.disabled = false;
+                generateBtn.textContent = "🚀 Generate Preview";
+            }
+        }
+    }, 50);
+}
 
-    const pathType = document.getElementById("pathType").value;
-    const filamentDia = parseFloat(document.getElementById("filamentDia").value) || 1.75;
-    const layerHeight = parseFloat(document.getElementById("layerHeight").value) || 0.2;
-    const zOffset = parseFloat(document.getElementById("zOffset").value) || 0.2;
-    const bedSize = parseFloat(document.getElementById("bedSize").value) || 250;
-
-    const printWidth = parseFloat(printWidthInput.value) || 100;
-    const printHeight = parseFloat(printHeightInput.value) || 100;
-
-    const spacing = parseFloat(document.getElementById("lineSpacing").value) || 0.6;
-    const minW = parseFloat(document.getElementById("minLineWidth").value) || 0.3;
-    const maxW = parseFloat(document.getElementById("maxLineWidth").value) || 0.8;
-    const mirrorimage = document.getElementById("mirrorimage").checked;
-
-    const minSpeedMMS = parseFloat(document.getElementById("minSpeed").value) || 15;
-    const maxSpeedMMS = parseFloat(document.getElementById("maxSpeed").value) || 60;
+/**
+ * Core processing logic (separated for cleaner error handling)
+ */
+function processImageCore() {
+    // Get and validate all parameters
+    const pathTypeElem = getElement("pathType");
+    const pathType = pathTypeElem ? pathTypeElem.value : "spiral";
+    
+    const filamentDia = safeParseFloat(getElement("filamentDia")?.value, 1.75, 0.1, 5);
+    const layerHeight = safeParseFloat(getElement("layerHeight")?.value, 0.2, 0.05, 1);
+    const zOffset = safeParseFloat(getElement("zOffset")?.value, 0.2, 0, 50);
+    const bedSize = safeParseFloat(getElement("bedSize")?.value, 250, 50, 500);
+    
+    const printWidth = safeParseFloat(printWidthInput?.value, 100, 1, bedSize);
+    const printHeight = safeParseFloat(printHeightInput?.value, 100, 1, bedSize);
+    
+    const spacing = safeParseFloat(getElement("lineSpacing")?.value, 0.6, 0.1, 10);
+    if (spacing <= 0) {
+        showErrorMessage("Line spacing must be greater than 0");
+        return;
+    }
+    
+    const minW = safeParseFloat(getElement("minLineWidth")?.value, 0.2, 0.05, 2);
+    const maxW = safeParseFloat(getElement("maxLineWidth")?.value, 0.8, 0.05, 3);
+    
+    if (minW >= maxW) {
+        showErrorMessage("Min line width must be less than max line width");
+        return;
+    }
+    
+    const mirrorImageElem = getElement("mirrorimage");
+    const mirrorimage = mirrorImageElem ? mirrorImageElem.checked : false;
+    
+    const minSpeedMMS = safeParseFloat(getElement("minSpeed")?.value, 10, 1, 200);
+    const maxSpeedMMS = safeParseFloat(getElement("maxSpeed")?.value, 100, 1, 300);
+    
+    if (minSpeedMMS >= maxSpeedMMS) {
+        showErrorMessage("Min speed must be less than max speed");
+        return;
+    }
+    
     const minSpeed = minSpeedMMS * 60;
     const maxSpeed = maxSpeedMMS * 60;
-    const gammaVal = parseFloat(document.getElementById("gamma").value) || 1.5;
-    const squiggleAmp = parseFloat(document.getElementById("squiggleAmp").value) || 0.0;
-    const squiggleFreq = parseFloat(document.getElementById("squiggleFreq").value) || 5;
+    const gammaVal = safeParseFloat(getElement("gamma")?.value, 1.5, 0.5, 3);
+    const squiggleAmp = safeParseFloat(getElement("squiggleAmp")?.value, 0, 0, 5);
+    const squiggleFreq = safeParseFloat(getElement("squiggleFreq")?.value, 1, 0.1, 20);
     const useSquiggle = squiggleAmp > 0.01;
-    const fractalOrder = parseInt(document.getElementById("hilbertOrder").value) || 6;
-
-    const addCircularBase = document.getElementById("addCircularBase").checked;
-    const baseMargin = parseFloat(document.getElementById("baseMargin").value) || 2;
-    const baseLayers = Math.max(1, parseInt(document.getElementById("baseLayers").value) || 2);
-
-    const anaW = originalImage.width;
-    const anaH = originalImage.height;
-
-    hiddenCanvas.width = anaW;
-    hiddenCanvas.height = anaH;
-    ctx.drawImage(originalImage, 0, 0, anaW, anaH);
-    const pixels = ctx.getImageData(0, 0, anaW, anaH).data;
-
+    const fractalOrder = safeParseInt(getElement("hilbertOrder")?.value, 6, 3, 8);
+    
+    const addCircularBaseElem = getElement("addCircularBase");
+    const addCircularBase = addCircularBaseElem ? addCircularBaseElem.checked : false;
+    const baseMargin = safeParseFloat(getElement("baseMargin")?.value, 2, 0, 100);
+    const baseLayers = safeParseInt(getElement("baseLayers")?.value, 2, 1, 20);
+    
+    const anaW = appState.originalImage.width;
+    const anaH = appState.originalImage.height;
+    
+    // Get or cache pixel data
+    let pixels;
+    if (appState.cachedPixels && 
+        appState.cachedDimensions?.width === anaW && 
+        appState.cachedDimensions?.height === anaH) {
+        pixels = appState.cachedPixels;
+    } else {
+        hiddenCanvas.width = anaW;
+        hiddenCanvas.height = anaH;
+        ctx.drawImage(appState.originalImage, 0, 0, anaW, anaH);
+        pixels = ctx.getImageData(0, 0, anaW, anaH).data;
+        
+        // Cache for future use
+        appState.cachedPixels = pixels;
+        appState.cachedDimensions = { width: anaW, height: anaH };
+    }
+    
     const offsetX = (bedSize - printWidth) / 2;
     const offsetY = (bedSize - printHeight) / 2;
     const filArea = Math.PI * Math.pow(filamentDia / 2, 2);
     const safeZ = zOffset + 5.0;
     let totalE = 0;
-
+    
     const printDim = Math.min(printWidth, printHeight);
     const baseRadius = printDim / 2;
     const centerX = offsetX + printWidth / 2;
     const centerY = offsetY + printHeight / 2;
-    const innerRadius = Math.max(0, baseRadius - baseMargin);
-
+    let innerRadius = Math.max(0, baseRadius - baseMargin);
+    
     previewCanvas.width = bedSize * PREVIEW_SCALE;
     previewCanvas.height = bedSize * PREVIEW_SCALE;
     drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
-
+    
+    // Draw base preview if enabled
     if (addCircularBase) {
         previewCtx.strokeStyle = "rgba(100,100,100,0.5)";
         previewCtx.lineWidth = 1 / PREVIEW_SCALE;
         previewCtx.setLineDash([4, 4]);
+        
         if (pathType === "spiral") {
+            // Circular preview
             previewCtx.beginPath();
             previewCtx.arc(centerX, centerY, baseRadius, 0, TWO_PI);
             previewCtx.stroke();
@@ -392,13 +1147,19 @@ function processImage() {
             previewCtx.beginPath();
             previewCtx.arc(centerX, centerY, innerRadius, 0, TWO_PI);
             previewCtx.stroke();
-        } else if (pathType === "squareSpiral") {
+        } else if (pathType === "squareSpiral" || pathType === "hilbert") {
+            // Square preview
+            const centerOffset = {
+                x: centerX - printDim / 2,
+                y: centerY - printDim / 2
+            };
             previewCtx.strokeRect(centerOffset.x, centerOffset.y, printDim, printDim);
             previewCtx.strokeStyle = "rgba(37, 99, 235, 0.8)";
             previewCtx.setLineDash([2, 2]);
             const ins = Math.min(baseMargin, printDim / 2);
             previewCtx.strokeRect(centerOffset.x + ins, centerOffset.y + ins, printDim - 2 * ins, printDim - 2 * ins);
         } else {
+            // Rectangular preview (for zigzag, diagonal)
             previewCtx.strokeRect(offsetX, offsetY, printWidth, printHeight);
             previewCtx.strokeStyle = "rgba(37, 99, 235, 0.8)";
             previewCtx.setLineDash([2, 2]);
@@ -407,20 +1168,21 @@ function processImage() {
         }
         previewCtx.setLineDash([]);
     }
-
+    
+    // Start G-code generation
     let gcode = [];
-    gcode.push(`; --- G-Code Art Generator v6.3 (Zoomed) ---`);
+    gcode.push(`; --- G-Code Art Generator (Improved) ---`);
     gcode.push(`G90 ; Absolute Coordinates (XYZE)`);
     gcode.push(`M83 ; Relative Extrusion`);
-
+    
     let startPoint = { x: offsetX, y: offsetY };
     const centerOffset = {
         x: offsetX + (printWidth - printDim) / 2,
         y: offsetY + (printHeight - printDim) / 2
     };
-
+    
     if (["spiral", "squareSpiral"].includes(pathType)) {
-        startPoint = { x: offsetX + printWidth / 2, y: offsetY + printHeight / 2 };
+        startPoint = { x: centerX, y: centerY };
     } else if (pathType === "hilbert") {
         const order = fractalOrder;
         const N = 1 << order;
@@ -428,160 +1190,115 @@ function processImage() {
         let p0 = hilbert(order, 0);
         startPoint = { x: centerOffset.x + p0.x * step, y: centerOffset.y + p0.y * step };
     }
-
+    
     let prevX = startPoint.x;
     let prevY = startPoint.y;
-
+    
     const BASE_SPACING = 0.5;
     const BASE_LINE_WIDTH = 0.5;
-    const baseSpeedMMS = parseFloat(document.getElementById("baseSpeed")?.value) || 30;
+    const baseSpeedMMS = safeParseFloat(getElement("baseSpeed")?.value, 30, 10, 150);
     const baseSpeed = baseSpeedMMS * 60;
-
+    
     let drawingStartZ = zOffset;
-
+    
     function writeBaseSegment(x, y, customSpeed = baseSpeed) {
         const dist = Math.hypot(x - prevX, y - prevY);
         if (dist < 0.01) return;
         const vol = dist * BASE_LINE_WIDTH * layerHeight;
         const e = vol / filArea;
-        // Usa customSpeed invece della velocità fissa
         gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(5)} F${customSpeed.toFixed(0)}`);
         totalE += e;
         prevX = x;
         prevY = y;
     }
-
-    // Recupero i valori dai nuovi selettori HTML
-    const changeMode = document.getElementById("filamentChangeMode").value;
-    const amsBaseSlot = document.getElementById("amsBaseSlot").value;
-    const amsDrawingSlot = document.getElementById("amsDrawingSlot").value;
-
+    
+    const changeMode = getElement("filamentChangeMode")?.value || "manual";
+    const amsBaseSlot = getElement("amsBaseSlot")?.value || "T0";
+    const amsDrawingSlot = getElement("amsDrawingSlot")?.value || "T1";
+    
+    // Generate base layer if enabled
     if (addCircularBase) {
-        // --- 1. SELEZIONE FILAMENTO INIZIALE (SOLO AMS) ---
         if (changeMode === "ams") {
             gcode.push(`${amsBaseSlot} ; Select Base Filament Slot`);
             gcode.push(`M400 ; Wait for load`);
         }
-
-        gcode.push(`; --- Circular Base with 3 Walls and Zig-Zag Infill ---`);
-        gcode.push(`G0 Z${safeZ.toFixed(3)} F6000 ; Lift to safe Z`);
-
-        const baseOverlap = 0.45;
-        const wallSpacing = 0.42;
-        const numWalls = 3;
-
-        for (let layer = 0; layer < baseLayers; layer++) {
-            const z = zOffset + layer * layerHeight;
-            gcode.push(`G1 Z${z.toFixed(3)} F1000 ; Base layer ${layer + 1}/${baseLayers}`);
-
-            // 1. Disegno dei muri (Walls)
-            for (let w = 0; w < numWalls; w++) {
-                const currentWallRadius = baseRadius - w * wallSpacing;
-                const numPoints = Math.max(60, Math.ceil((TWO_PI * currentWallRadius) / 0.5));
-                const dAngle = TWO_PI / numPoints;
-                const startX = centerX + currentWallRadius;
-                const startY = centerY;
-
-                gcode.push(`G0 X${startX.toFixed(3)} Y${startY.toFixed(3)} F6000`);
-                prevX = startX;
-                prevY = startY;
-
-                for (let i = 1; i <= numPoints; i++) {
-                    const angle = i * dAngle;
-                    const x = centerX + currentWallRadius * Math.cos(angle);
-                    const y = centerY + currentWallRadius * Math.sin(angle);
-                    writeBaseSegment(x, y);
-                }
-            }
-
-            // --- NOVITÀ: OTTIMIZZAZIONE TRANSIZIONE MURI -> INFILL ---
-            gcode.push(`G1 E-0.8 F3000 ; Retrazione anti-blob`);
-            gcode.push(`G0 Z${(z + 0.4).toFixed(3)} F6000 ; Z-Hop di sicurezza`);
-
-            let goingRight = true;
-            // Ridotto l'overlap da +0.1 a -0.05 per non "pestare" i muri test a 0
-            const fillLimitRadius = baseRadius - numWalls * wallSpacing;
-            const infillTotalHeight = fillLimitRadius * 2;
-
-            for (let yRel = -fillLimitRadius; yRel <= fillLimitRadius; yRel += baseOverlap) {
-                const xLimit = Math.sqrt(Math.max(0, Math.pow(fillLimitRadius, 2) - Math.pow(yRel, 2)));
-                const xLeft = centerX - xLimit;
-                const xRight = centerX + xLimit;
-                const currentY = centerY + yRel;
-
-                // --- NOVITÀ: VELOCITÀ RIDOTTA NEL PRIMO 10% ---
-                let currentSpeed = baseSpeed;
-                if (yRel < -fillLimitRadius + infillTotalHeight * 0.1) {
-                    currentSpeed = baseSpeed * 0.5; // Vai al 50% della velocità
-                }
-
-                if (goingRight) {
-                    if (yRel === -fillLimitRadius || Math.abs(yRel + fillLimitRadius) < 0.01) {
-                        gcode.push(`G0 X${xLeft.toFixed(3)} Y${currentY.toFixed(3)} F6000`);
-                        gcode.push(`G1 Z${z.toFixed(3)} F1000`);
-                        gcode.push(`G1 E0.9 F3000 ; Prime leggermente aumentato`); // Correzione punto 1
-                        prevX = xLeft;
-                        prevY = currentY;
-                    } else {
-                        writeBaseSegment(xLeft, currentY, currentSpeed);
-                    }
-                    // Sottraiamo 0.1mm dalla coordinata finale X per fermare l'estrusione un pelo prima
-                    writeBaseSegment(xRight - 0.1, currentY, currentSpeed);
-                } else {
-                    writeBaseSegment(xRight, currentY, currentSpeed);
-                    // Sottraiamo 0.1mm dalla coordinata finale X (lato sinistro)
-                    writeBaseSegment(xLeft + 0.1, currentY, currentSpeed);
-                }
-                goingRight = !goingRight;
-            }
-            // Fine layer: un piccolo salto prima di salire al prossimo
-            gcode.push(`G0 Z${(z + 0.5).toFixed(3)} F6000`);
-        }
-
-        // --- 2. TRANSIZIONE AL DISEGNO ---
-        // --- 2. TRANSIZIONE AL DISEGNO (OTTIMIZZATA) ---
-        gcode.push(`; --- TRANSITION TO ARTWORK ---`);
-
-        if (changeMode === "ams") {
-            gcode.push(`M400 ; Finish all moves`);
-            gcode.push(`G91 ; Relative`);
-            gcode.push(`G1 Z5 F3000 ; Lift for toolchange`);
-            gcode.push(`G90 ; Absolute`);
-            gcode.push(`${amsDrawingSlot} ; Switch to Drawing Filament`);
-            gcode.push(`M400 ; Wait for AMS`);
+        
+        gcode.push(`G0 Z${safeZ.toFixed(3)} F6000`);
+        
+        // Prepare parameters for base generation
+        const baseParams = {
+            gcode,
+            baseLayers,
+            zOffset,
+            layerHeight,
+            baseRadius,
+            printDim,
+            printWidth,
+            printHeight,
+            baseMargin,
+            centerX,
+            centerY,
+            centerOffset,
+            offsetX,
+            offsetY,
+            baseSpeed,
+            filArea,
+            prevX,
+            prevY,
+            totalE
+        };
+        
+        // ADAPTIVE BASE GENERATION - Choose shape based on path type
+        let innerMargin;
+        if (pathType === "spiral") {
+            innerMargin = generateCircularBase(baseParams);
+        } else if (pathType === "squareSpiral" || pathType === "hilbert") {
+            innerMargin = generateSquareBase(baseParams);
         } else {
-            gcode.push(`G91 ; Relative`);
-            gcode.push(`G1 E-5 F3000 ; Retract`);
-            gcode.push(`G1 Z10 F1000 ; Safety lift`);
-            gcode.push(`G90 ; Absolute`);
-            gcode.push(`G0 X0 Y0 F6000 ; Park for manual change`);
-            gcode.push(`M600 ; Manual Pause`);
+            // zigzag, diagonal
+            innerMargin = generateRectangularBase(baseParams);
         }
-
+        
+        // Update variables from params
+        prevX = baseParams.prevX;
+        prevY = baseParams.prevY;
+        totalE = baseParams.totalE;
+        
+        // Transition to artwork
+        gcode.push(`; --- TRANSITION TO ARTWORK ---`);
+        
+        if (changeMode === "ams") {
+            gcode.push(`M400`);
+            gcode.push(`G91`);
+            gcode.push(`G1 Z5 F3000`);
+            gcode.push(`G90`);
+            gcode.push(`${amsDrawingSlot}`);
+            gcode.push(`M400`);
+        } else {
+            gcode.push(`G91`);
+            gcode.push(`G1 E-5 F3000`);
+            gcode.push(`G1 Z10 F1000`);
+            gcode.push(`G90`);
+            gcode.push(`G0 X0 Y0 F6000`);
+            gcode.push(`M600`);
+        }
+        
         drawingStartZ = zOffset + baseLayers * layerHeight;
         gcode.push(`; --- STARTING ARTWORK DRAWING ---`);
-
-        // 1. Spostamento rapido sopra il punto di inizio
-        gcode.push(
-            `G0 X${startPoint.x.toFixed(3)} Y${startPoint.y.toFixed(3)} Z${(drawingStartZ + 2).toFixed(3)} F6000`
-        );
-
-        // 2. Discesa lenta in quota stampa
+        gcode.push(`G0 X${startPoint.x.toFixed(3)} Y${startPoint.y.toFixed(3)} Z${(drawingStartZ + 2).toFixed(3)} F6000`);
         gcode.push(`G1 Z${drawingStartZ.toFixed(3)} F1000`);
-
-        // 3. PRIMING: Estrude una piccolissima quantità stando fermi per riempire l'ugello
-        gcode.push(`G1 E0.5 F600 ; Prime nozzle prima di partire`);
-        gcode.push(`G4 P200 ; Pausa di 0.2 secondi per stabilizzare`);
-
-        // 4. Inizio effettivo con velocità ridotta per i primi millimetri
-        // Reset posizione precedente
+        gcode.push(`G1 E0.5 F600`);
+        gcode.push(`G4 P200`);
+        
         prevX = startPoint.x;
         prevY = startPoint.y;
-        gcode.push(`G92 E0 ; Reset estrusi`);
+        gcode.push(`G92 E0`);
+        
+        // Update innerRadius for clip function based on shape
+        innerRadius = innerMargin;
     } else {
-        // --- 3. LOGICA SENZA BASE (SELEZIONE SLOT DISEGNO) ---
         if (changeMode === "ams") {
-            gcode.push(`${amsDrawingSlot} ; Select Drawing Filament (No base)`);
+            gcode.push(`${amsDrawingSlot}`);
         }
         gcode.push(`G0 Z${safeZ.toFixed(3)} F3000`);
         gcode.push(`G0 X${startPoint.x.toFixed(3)} Y${startPoint.y.toFixed(3)} F6000`);
@@ -589,10 +1306,10 @@ function processImage() {
         prevX = startPoint.x;
         prevY = startPoint.y;
     }
-
+    
     function writeMove(x, y, targetW, targetF, isTravel = false) {
         const dist = Math.hypot(x - prevX, y - prevY);
-
+        
         if (isTravel || dist < 0.01) {
             gcode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} F6000`);
             previewCtx.beginPath();
@@ -607,7 +1324,7 @@ function processImage() {
             const e = vol / filArea;
             gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} E${e.toFixed(5)} F${targetF.toFixed(0)}`);
             totalE += e;
-
+            
             previewCtx.beginPath();
             previewCtx.moveTo(prevX, prevY);
             previewCtx.lineTo(x, y);
@@ -620,13 +1337,15 @@ function processImage() {
         prevY = y;
         return dist;
     }
-
+    
     function isInsideBaseClip(x, y) {
         if (pathType === "spiral") {
-            return Math.hypot(x - centerX, y - centerY) <= innerRadius;
+            // For circular base, use radius-based check
+            return Math.hypot(x - centerX, y - centerY) <= (baseRadius - innerRadius);
         }
-        if (pathType === "squareSpiral") {
-            const ins = baseMargin;
+        if (pathType === "squareSpiral" || pathType === "hilbert") {
+            // For square base, use square bounds check
+            const ins = innerRadius;
             return (
                 x >= centerOffset.x + ins &&
                 x <= centerOffset.x + printDim - ins &&
@@ -634,7 +1353,8 @@ function processImage() {
                 y <= centerOffset.y + printDim - ins
             );
         }
-        const ins = baseMargin;
+        // For rectangular base (zigzag, diagonal), use rectangular bounds check
+        const ins = innerRadius;
         return (
             x >= offsetX + ins &&
             x <= offsetX + printWidth - ins &&
@@ -642,28 +1362,28 @@ function processImage() {
             y <= offsetY + printHeight - ins
         );
     }
-
+    
     function doSmartMove(x, y, isConnect = false) {
         if (addCircularBase && !isInsideBaseClip(x, y)) {
             writeMove(x, y, 0, 0, true);
             return;
         }
-
+        
         let u = (x - offsetX) / printWidth;
         let v_yup = (y - offsetY) / printHeight;
-
+        
         let u_sample = u;
         let v_sample_yup = v_yup;
-
+        
         if (mirrorimage) {
             u_sample = 1.0 - u;
         }
-
+        
         const darkness = getBrightnessAtUV(u_sample, v_sample_yup, pixels, anaW, anaH, gammaVal);
-
+        
         const targetW = minW + darkness * (maxW - minW);
         const targetF = maxSpeed - darkness * (maxSpeed - minSpeed);
-
+        
         if (isConnect || !useSquiggle || darkness < 0.1) {
             writeMove(x, y, targetW, targetF, isConnect);
         } else {
@@ -671,40 +1391,41 @@ function processImage() {
             const startY = prevY;
             const distTotal = Math.hypot(x - startX, y - startY);
             const numSegments = Math.max(2, Math.floor(distTotal / 0.1));
-
+            
             const dx = (x - startX) / numSegments;
             const dy = (y - startY) / numSegments;
-
+            
             const norm = Math.hypot(dx, dy);
             let dx_perp = -dy / norm;
             let dy_perp = dx / norm;
-
+            
             const amplitude = squiggleAmp * darkness;
             const freq = squiggleFreq * TWO_PI;
-
+            
             for (let i = 1; i <= numSegments; i++) {
                 const currentDist = (i / numSegments) * distTotal;
-
+                
                 let px_straight = startX + dx * i;
                 let py_straight = startY + dy * i;
-
+                
                 const phase = currentDist * freq;
                 const offsetMag = Math.sin(phase) * amplitude;
-
+                
                 const px_squiggle = px_straight + dx_perp * offsetMag;
                 const py_squiggle = py_straight + dy_perp * offsetMag;
-
+                
                 writeMove(px_squiggle, py_squiggle, targetW, targetF);
             }
         }
     }
-
+    
+    // Generate path based on type
     if (pathType === "hilbert") {
         const order = fractalOrder;
         const N = 1 << order;
         const totalPoints = N * N;
         const step = printDim / N;
-
+        
         for (let d = 1; d < totalPoints; d++) {
             let p = hilbert(order, d);
             doSmartMove(centerOffset.x + p.x * step, centerOffset.y + p.y * step);
@@ -713,13 +1434,16 @@ function processImage() {
         let currentSize = printDim;
         let currentOffset = { x: centerOffset.x, y: centerOffset.y };
         const res = 0.5;
-
-        while (currentSize > spacing * 1.5) {
+        
+        let iterations = 0;
+        while (currentSize > spacing * 1.5 && iterations < MAX_LOOP_ITERATIONS) {
+            iterations++;
+            
             let x0 = currentOffset.x;
             let y0 = currentOffset.y;
             let x1 = currentOffset.x + currentSize;
             let y1 = currentOffset.y + currentSize;
-
+            
             const moveLine = (startX, startY, endX, endY, length) => {
                 const numSegs = Math.max(2, Math.floor(length / res));
                 for (let k = 1; k <= numSegs; k++) {
@@ -727,23 +1451,27 @@ function processImage() {
                     doSmartMove(startX + (endX - startX) * t, startY + (endY - startY) * t);
                 }
             };
-
+            
             moveLine(x0, y0, x1, y0, currentSize);
             moveLine(x1, y0, x1, y1, currentSize);
             moveLine(x1, y1, x0, y1, currentSize);
-
+            
             let remainingLength = currentSize - spacing;
             moveLine(x0, y1, x0, y1 - remainingLength, remainingLength);
-
+            
             let nextX = currentOffset.x + spacing;
             let nextY = currentOffset.y + spacing;
             doSmartMove(nextX, nextY, true);
-
+            
             currentSize -= spacing * 2;
             currentOffset.x += spacing;
             currentOffset.y += spacing;
         }
-
+        
+        if (iterations >= MAX_LOOP_ITERATIONS) {
+            console.warn("Square spiral hit max iterations");
+        }
+        
         if (currentSize > 0) {
             doSmartMove(currentOffset.x + currentSize / 2, currentOffset.y + currentSize / 2);
         }
@@ -751,15 +1479,15 @@ function processImage() {
         const axisStep = spacing * Math.sqrt(2);
         const maxSum = printWidth + printHeight;
         const numDiagonals = Math.floor(maxSum / axisStep);
-
+        
         for (let i = 0; i <= numDiagonals; i++) {
             let sum = i * axisStep;
-
+            
             let p1x = sum <= printHeight ? 0 : sum - printHeight;
             let p1y = sum <= printHeight ? sum : printHeight;
             let p2x = sum <= printWidth ? sum : printWidth;
             let p2y = sum <= printWidth ? 0 : sum - printWidth;
-
+            
             let startX, startY, endX, endY;
             if (i % 2 === 0) {
                 startX = p1x;
@@ -772,21 +1500,21 @@ function processImage() {
                 endX = p1x;
                 endY = p1y;
             }
-
+            
             startX = Math.max(0, Math.min(printWidth, startX));
             startY = Math.max(0, Math.min(printHeight, startY));
             endX = Math.max(0, Math.min(printWidth, endX));
             endY = Math.max(0, Math.min(printHeight, endY));
-
+            
             if (i > 0) {
                 doSmartMove(offsetX + startX, offsetY + startY, true);
             }
-
+            
             const distLine = Math.hypot(endX - startX, endY - startY);
-
+            
             if (distLine > 0.01) {
                 const numSegs = Math.max(2, Math.floor(distLine / 0.5));
-
+                
                 for (let k = 1; k <= numSegs; k++) {
                     let t = k / numSegs;
                     doSmartMove(offsetX + startX + (endX - startX) * t, offsetY + startY + (endY - startY) * t);
@@ -799,32 +1527,40 @@ function processImage() {
         let radius = 0.0;
         let angle = 0;
         const maxRadius = addCircularBase ? innerRadius : printDim / 2;
-
-        while (radius < maxRadius) {
+        
+        let iterations = 0;
+        while (radius < maxRadius && iterations < MAX_LOOP_ITERATIONS) {
+            iterations++;
+            
             let res = 0.5;
             let dTheta = res / Math.max(0.5, radius);
             angle += dTheta;
             radius = (spacing / TWO_PI) * angle;
-
+            
             if (radius > maxRadius) break;
-
+            
             let px = cx + radius * Math.cos(angle);
             let py = cy + radius * Math.sin(angle);
             doSmartMove(px, py);
         }
+        
+        if (iterations >= MAX_LOOP_ITERATIONS) {
+            console.warn("Spiral hit max iterations");
+        }
     } else {
+        // Zigzag (default)
         const lines = Math.floor(printHeight / spacing);
-
+        
         for (let i = 0; i < lines; i++) {
             let y = i * spacing;
             let even = i % 2 === 0;
             let xStart = even ? 0 : printWidth;
             let xEnd = even ? printWidth : 0;
-
+            
             if (i > 0) {
                 doSmartMove(offsetX + xStart, offsetY + y, true);
             }
-
+            
             const distLine = printWidth;
             const numSegs = Math.max(2, Math.floor(distLine / 0.5));
             for (let k = 1; k <= numSegs; k++) {
@@ -834,267 +1570,247 @@ function processImage() {
             }
         }
     }
-
-    gcode.push(`G0 Z${safeZ.toFixed(3)} F3000 ; Lift to safe Z`);
+    
+    gcode.push(`G0 Z${safeZ.toFixed(3)} F3000`);
     gcode.push(`; Total Extruded: E${totalE.toFixed(2)}`);
     gcode.push(`; --- End of Central G-Code Block ---`);
-
-    // --- 1. PREPARAZIONE G-CODE E MERGE ---
+    
     const artOnlyGcode = gcode.join("\n");
-
-    // Eseguiamo il merge con il template caricato cercando ;MARKER
     const finalGcode = mergeWithTemplate(artOnlyGcode);
-
-    // Aggiorniamo la variabile globale gcodeContent per il download
-    gcodeContent = finalGcode;
-
-    // Aggiorniamo la textarea se presente
-    const outputArea = document.getElementById("gcodeOutput");
+    
+    appState.gcodeContent = finalGcode;
+    
+    const outputArea = getElement("gcodeOutput");
     if (outputArea) {
         outputArea.value = finalGcode;
     }
-
-    // --- 2. AGGIORNAMENTO PREVIEW E STATISTICHE ---
+    
     if (typeof update3DPreviewFromGcode === "function") {
         update3DPreviewFromGcode(artOnlyGcode);
     }
-
-    document.getElementById("downloadBtn").style.display = "inline-block";
-    const statsElem = document.getElementById("stats");
+    
+    const downloadBtn = getElement("downloadBtn");
+    if (downloadBtn) {
+        downloadBtn.style.display = "inline-block";
+    }
+    
+    const statsElem = getElement("stats");
     if (statsElem) {
         statsElem.style.display = "block";
-        const baseInfo =
-            typeof addCircularBase !== "undefined" && addCircularBase
-                ? `Base: ${baseLayers} layer(s), margin ${baseMargin}mm (drawing on top after M0 pause)<br>`
-                : "";
-
+        const baseInfo = addCircularBase
+            ? `Base: ${baseLayers} layer(s), margin ${baseMargin}mm<br>`
+            : "";
+        
         statsElem.innerHTML = `
             <strong>Result:</strong><br>
-            Print Dimensions: ${printWidth.toFixed(2)}x${printHeight.toFixed(2)}mm<br>
+            Print Dimensions: ${printWidth.toFixed(2)}×${printHeight.toFixed(2)}mm<br>
             ${baseInfo}Estimated Filament: ${(totalE / 1000).toFixed(2)}m<br>
-            Speed: ${minSpeedMMS} - ${maxSpeedMMS} mm/s
+            Speed: ${minSpeedMMS}-${maxSpeedMMS} mm/s
         `;
     }
 }
 
-// --- 3D PREVIEW ENGINE (three.js) ---
+// ==================== 3D PREVIEW ====================
+
 function init3DPreview() {
-    if (!window.THREE || threeRenderer) return;
-
-    const container = document.getElementById("preview3dContainer");
+    if (!window.THREE || appState.threeRenderer) return;
+    
+    const container = getElement("preview3dContainer");
     if (!container) return;
-
+    
     const width = container.clientWidth || 400;
     const height = container.clientHeight || 240;
-
-    // --- SCENE ---
-    threeScene = new THREE.Scene();
-    threeScene.background = new THREE.Color(0x020617);
-
-    // --- CAMERA ---
-    threeCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
-    threeCamera.up.set(0, 0, 1);
-
-    // --- RENDERER ---
-    threeRenderer = new THREE.WebGLRenderer({ antialias: true });
-    threeRenderer.setSize(width, height);
-    threeRenderer.setPixelRatio(window.devicePixelRatio || 1);
-
-    // --- LIGHTS ---
+    
+    appState.threeScene = new THREE.Scene();
+    appState.threeScene.background = new THREE.Color(0x020617);
+    
+    appState.threeCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
+    appState.threeCamera.up.set(0, 0, 1);
+    
+    appState.threeRenderer = new THREE.WebGLRenderer({ antialias: true });
+    appState.threeRenderer.setSize(width, height);
+    appState.threeRenderer.setPixelRatio(window.devicePixelRatio || 1);
+    
     const ambLight = new THREE.AmbientLight(0xffffff, 0.8);
-    threeScene.add(ambLight);
-
+    appState.threeScene.add(ambLight);
+    
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
     dirLight.position.set(100, -100, 200);
-    threeScene.add(dirLight);
-
-    // --- ATTACH CANVAS ---
-    container.innerHTML = "";
-    container.appendChild(threeRenderer.domElement);
-
-    // 🔴 FONDAMENTALE: inizializza subito la posizione camera
+    appState.threeScene.add(dirLight);
+    
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
+    container.appendChild(appState.threeRenderer.domElement);
+    
     updateThreeCameraFromOrbit();
-
-    // --- CONTROLS ---
-    const dom = threeRenderer.domElement;
+    
+    const dom = appState.threeRenderer.domElement;
     dom.style.cursor = "grab";
-
+    
     dom.addEventListener("mousedown", (e) => {
-        if (e.button === 2) threePanDragging = true;
-        else threeOrbitDragging = true;
-
-        threeOrbitLastX = e.clientX;
-        threeOrbitLastY = e.clientY;
+        if (e.button === 2) appState.threePanDragging = true;
+        else appState.threeOrbitDragging = true;
+        
+        appState.threeOrbitLastX = e.clientX;
+        appState.threeOrbitLastY = e.clientY;
         dom.style.cursor = "grabbing";
     });
-
+    
     window.addEventListener("mouseup", () => {
-        threeOrbitDragging = false;
-        threePanDragging = false;
+        appState.threeOrbitDragging = false;
+        appState.threePanDragging = false;
         dom.style.cursor = "grab";
     });
-
+    
     dom.addEventListener("mousemove", (e) => {
-        if (!threeCamera) return;
-
-        const dx = e.clientX - threeOrbitLastX;
-        const dy = e.clientY - threeOrbitLastY;
-        threeOrbitLastX = e.clientX;
-        threeOrbitLastY = e.clientY;
-
-        if (threeOrbitDragging) {
-            threeOrbitTheta -= dx * 0.005;
-            threeOrbitPhi += dy * 0.005;
-            threeOrbitPhi = Math.max(0.05, Math.min(Math.PI / 2 - 0.05, threeOrbitPhi));
+        if (!appState.threeCamera) return;
+        
+        const dx = e.clientX - appState.threeOrbitLastX;
+        const dy = e.clientY - appState.threeOrbitLastY;
+        appState.threeOrbitLastX = e.clientX;
+        appState.threeOrbitLastY = e.clientY;
+        
+        if (appState.threeOrbitDragging) {
+            appState.threeOrbitTheta -= dx * 0.005;
+            appState.threeOrbitPhi += dy * 0.005;
+            appState.threeOrbitPhi = Math.max(0.05, Math.min(Math.PI / 2 - 0.05, appState.threeOrbitPhi));
             updateThreeCameraFromOrbit();
-        } else if (threePanDragging) {
-            const panSpeed = threeOrbitRadius * 0.001;
-
-            // Direzione destra della camera (proiettata su XY)
-            const right = new THREE.Vector3(Math.cos(threeOrbitTheta), Math.sin(threeOrbitTheta), 0).normalize();
-
-            // Direzione avanti (per movimento verticale su schermo)
-            const forward = new THREE.Vector3(-Math.sin(threeOrbitTheta), Math.cos(threeOrbitTheta), 0).normalize();
-
+        } else if (appState.threePanDragging) {
+            const panSpeed = appState.threeOrbitRadius * 0.001;
+            
+            const right = new THREE.Vector3(
+                Math.cos(appState.threeOrbitTheta),
+                Math.sin(appState.threeOrbitTheta),
+                0
+            ).normalize();
+            
+            const forward = new THREE.Vector3(
+                -Math.sin(appState.threeOrbitTheta),
+                Math.cos(appState.threeOrbitTheta),
+                0
+            ).normalize();
+            
             const moveRight = -dy * panSpeed;
             const moveForward = -dx * panSpeed;
-
+            
             const move = new THREE.Vector3();
             move.addScaledVector(right, moveRight);
             move.addScaledVector(forward, moveForward);
-
-            // 🔴 Sposta SIA target che camera
-            threeTarget.add(move);
-            threeCamera.position.add(move);
+            
+            appState.threeTarget.add(move);
+            appState.threeCamera.position.add(move);
         }
     });
-
-    dom.addEventListener(
-        "wheel",
-        (e) => {
-            if (!threeCamera) return;
-            e.preventDefault();
-
-            const rect = dom.getBoundingClientRect();
-
-            const mouse = new THREE.Vector2(
-                ((e.clientX - rect.left) / rect.width) * 2 - 1,
-                -((e.clientY - rect.top) / rect.height) * 2 + 1
-            );
-
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(mouse, threeCamera);
-
-            // Intersezione con piano Z=0
-            const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-            const intersection = new THREE.Vector3();
-            raycaster.ray.intersectPlane(plane, intersection);
-
-            if (!intersection) return;
-
-            const zoomFactor = 1 + e.deltaY * 0.001;
-            const newRadius = THREE.MathUtils.clamp(threeOrbitRadius * zoomFactor, 20, 2000);
-
-            const scale = newRadius / threeOrbitRadius;
-            threeOrbitRadius = newRadius;
-
-            // Compensazione per mantenere il punto sotto il mouse fermo
-            const offset = new THREE.Vector3().subVectors(intersection, threeTarget).multiplyScalar(1 - scale);
-
-            threeTarget.add(offset);
-            threeCamera.position.add(offset);
-
-            updateThreeCameraFromOrbit();
-        },
-        { passive: false }
-    );
-
+    
+    dom.addEventListener("wheel", (e) => {
+        if (!appState.threeCamera) return;
+        e.preventDefault();
+        
+        const rect = dom.getBoundingClientRect();
+        
+        const mouse = new THREE.Vector2(
+            ((e.clientX - rect.left) / rect.width) * 2 - 1,
+            -((e.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(mouse, appState.threeCamera);
+        
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        const intersection = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersection);
+        
+        if (!intersection) return;
+        
+        const zoomFactor = 1 + e.deltaY * 0.001;
+        const newRadius = THREE.MathUtils.clamp(appState.threeOrbitRadius * zoomFactor, 20, 2000);
+        
+        const scale = newRadius / appState.threeOrbitRadius;
+        appState.threeOrbitRadius = newRadius;
+        
+        const offset = new THREE.Vector3().subVectors(intersection, appState.threeTarget).multiplyScalar(1 - scale);
+        
+        appState.threeTarget.add(offset);
+        appState.threeCamera.position.add(offset);
+        
+        updateThreeCameraFromOrbit();
+    }, { passive: false });
+    
     dom.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    // --- RESIZE HANDLER ---
+    
     window.addEventListener("resize", () => {
-        if (!threeRenderer || !threeCamera) return;
-
+        if (!appState.threeRenderer || !appState.threeCamera) return;
+        
         const w = container.clientWidth;
         const h = container.clientHeight;
-
-        threeRenderer.setSize(w, h);
-        threeCamera.aspect = w / h;
-        threeCamera.updateProjectionMatrix();
+        
+        appState.threeRenderer.setSize(w, h);
+        appState.threeCamera.aspect = w / h;
+        appState.threeCamera.updateProjectionMatrix();
     });
-
-    // --- ANIMATION LOOP ---
-    if (!threeAnimating) {
-        threeAnimating = true;
-
+    
+    if (!appState.threeAnimating) {
+        appState.threeAnimating = true;
+        
         const animate = () => {
             requestAnimationFrame(animate);
-            if (threeRenderer && threeScene && threeCamera) {
-                threeRenderer.render(threeScene, threeCamera);
+            if (appState.threeRenderer && appState.threeScene && appState.threeCamera) {
+                appState.threeRenderer.render(appState.threeScene, appState.threeCamera);
             }
         };
-
+        
         animate();
     }
 }
 
 function updateThreeCameraFromOrbit() {
-    if (!threeCamera) return;
-    const x = threeOrbitRadius * Math.cos(threeOrbitTheta) * Math.cos(threeOrbitPhi);
-    const y = threeOrbitRadius * Math.sin(threeOrbitTheta) * Math.cos(threeOrbitPhi);
-    const z = threeOrbitRadius * Math.sin(threeOrbitPhi);
-    threeCamera.position.set(x, y, z);
-    threeCamera.lookAt(threeTarget);
+    if (!appState.threeCamera) return;
+    const x = appState.threeOrbitRadius * Math.cos(appState.threeOrbitTheta) * Math.cos(appState.threeOrbitPhi);
+    const y = appState.threeOrbitRadius * Math.sin(appState.threeOrbitTheta) * Math.cos(appState.threeOrbitPhi);
+    const z = appState.threeOrbitRadius * Math.sin(appState.threeOrbitPhi);
+    appState.threeCamera.position.set(x, y, z);
+    appState.threeCamera.lookAt(appState.threeTarget);
 }
 
 function parseGcodeToSegments(gcode) {
     const lines = gcode.split("\n");
     let segments = [];
-    let x = 0,
-        y = 0,
-        z = 0;
-    let inBase = true; // Assume che si inizi con la base
-
+    let x = 0, y = 0, z = 0;
+    let inBase = true;
+    
     for (let raw of lines) {
         let line = raw.trim();
-
-        // 1. Gestione Commenti e Marker
+        
         if (!line || line.startsWith(";")) {
-            // Se troviamo il marker di inizio disegno, smettiamo di considerarlo "Base"
             if (line.includes("STARTING ARTWORK DRAWING")) {
                 inBase = false;
             }
-            continue; // Salta la riga
+            continue;
         }
-
-        // 2. Gestione Pause (M0, M600, ecc.)
+        
         if (line.startsWith("M0") || line.startsWith("M600") || line.includes("Pause")) {
-            // Spesso dopo la pausa inizia il disegno
             inBase = false;
             continue;
         }
-
-        // 3. Filtro comandi: Accetta solo G0 e G1
+        
         if (!(line.startsWith("G0") || line.startsWith("G1"))) continue;
-
-        // 4. Parsing Coordinate
-        let parts = line.split(/\s+/); // Divide per spazi multipli
-        let nx = x,
-            ny = y,
-            nz = z;
+        
+        let parts = line.split(/\s+/);
+        let nx = x, ny = y, nz = z;
         let extrude = false;
-        let foundCoord = false; // Flag per capire se è un movimento reale
-
+        let foundCoord = false;
+        
         for (let i = 1; i < parts.length; i++) {
-            const p = parts[i].toUpperCase(); // Normalizza maiuscole
-            if (p.length < 2) continue; // Salta frammenti troppo corti
-
+            const p = parts[i].toUpperCase();
+            if (p.length < 2) continue;
+            
             const code = p[0];
             const valStr = p.slice(1);
             const val = parseFloat(valStr);
-
-            if (isNaN(val)) continue; // PROTEZIONE NaN: Se non è un numero, ignora
-
+            
+            if (isNaN(val)) continue;
+            
             if (code === "X") {
                 nx = val;
                 foundCoord = true;
@@ -1106,14 +1822,12 @@ function parseGcodeToSegments(gcode) {
                 foundCoord = true;
             } else if (code === "E" && val > 0) extrude = true;
         }
-
-        // Se non ci sono coordinate valide o se non ci siamo mossi, salta
+        
         if (!foundCoord && !extrude) continue;
         if (Math.abs(nx - x) < 0.001 && Math.abs(ny - y) < 0.001 && Math.abs(nz - z) < 0.001) continue;
-
-        // 5. Aggiungi segmento sicuro
+        
         segments.push({
-            x1: x || 0, // Fallback a 0 se undefined
+            x1: x || 0,
             y1: y || 0,
             z1: z || 0,
             x2: nx || 0,
@@ -1122,8 +1836,7 @@ function parseGcodeToSegments(gcode) {
             extrude: line.startsWith("G1") && extrude,
             isBase: inBase
         });
-
-        // Aggiorna posizione attuale
+        
         x = nx;
         y = ny;
         z = nz;
@@ -1134,50 +1847,43 @@ function parseGcodeToSegments(gcode) {
 function update3DPreviewFromGcode(gcode) {
     if (!window.THREE) return;
     init3DPreview();
-    if (!threeScene) return;
-
+    if (!appState.threeScene) return;
+    
     const segments = parseGcodeToSegments(gcode);
     if (!segments.length) return;
-
-    // Pulizia della mesh precedente per evitare sovrapposizioni
-    if (threeMesh) {
-        threeScene.remove(threeMesh);
-        threeMesh.geometry.dispose();
-        threeMesh.material.dispose();
+    
+    if (appState.threeMesh) {
+        appState.threeScene.remove(appState.threeMesh);
+        appState.threeMesh.geometry.dispose();
+        appState.threeMesh.material.dispose();
     }
-
-    // Parametri del piatto di stampa (Anycubic Kobra 250x250)
+    
     const bedSize = 250;
     const scale = 120 / bedSize;
     const cx = bedSize / 2;
     const cy = bedSize / 2;
     const cz = 0;
-
+    
     const positions = new Float32Array(segments.length * 6);
     const colors = new Float32Array(segments.length * 6);
-
+    
     for (let i = 0; i < segments.length; i++) {
         const s = segments[i];
-
-        // Coordinate posizioni
+        
         positions[i * 6 + 0] = (s.x1 - cx) * scale;
         positions[i * 6 + 1] = (s.y1 - cy) * scale;
         positions[i * 6 + 2] = (s.z1 - cz) * scale;
         positions[i * 6 + 3] = (s.x2 - cx) * scale;
         positions[i * 6 + 4] = (s.y2 - cy) * scale;
         positions[i * 6 + 5] = (s.z2 - cz) * scale;
-
-        // --- LOGICA COLORI ---
+        
         let c;
         if (s.extrude) {
-            // Se è estrusione: Base = Bianca [1,1,1], Disegno = Nero [0,0,0]
             c = s.isBase ? [1.0, 1.0, 1.0] : [0.0, 0.0, 0.0];
         } else {
-            // Movimenti a vuoto (Travel): Grigio scuro/Bluastro per non disturbare
             c = [0.3, 0.3, 0.4];
         }
-
-        // Assegnazione colori ai due vertici del segmento
+        
         colors[i * 6 + 0] = c[0];
         colors[i * 6 + 1] = c[1];
         colors[i * 6 + 2] = c[2];
@@ -1185,111 +1891,137 @@ function update3DPreviewFromGcode(gcode) {
         colors[i * 6 + 4] = c[1];
         colors[i * 6 + 5] = c[2];
     }
-
+    
     const geom = new THREE.BufferGeometry();
     geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geom.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-
-    // Utilizziamo vertexColors: true per visualizzare i colori definiti sopra
-    threeMesh = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ vertexColors: true }));
-    threeScene.add(threeMesh);
+    
+    appState.threeMesh = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ vertexColors: true }));
+    appState.threeScene.add(appState.threeMesh);
 }
 
-// --- FUNZIONI DI SISTEMA ---
+// ==================== DOWNLOAD & MERGE ====================
+
 function downloadGcode() {
-    if (!gcodeContent || gcodeContent.length < 10) {
-        alert("First generate G-code");
+    if (!appState.gcodeContent || appState.gcodeContent.length < 10) {
+        showErrorMessage("Please generate G-code first");
         return;
     }
-    const blob = new Blob([gcodeContent], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "art_gcode.gcode";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    
+    try {
+        const blob = new Blob([appState.gcodeContent], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "art_gcode.gcode";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error("Download error:", error);
+        showErrorMessage("Failed to download G-code");
+    }
 }
 
 function mergeWithTemplate(artGcode) {
-    if (!gcodeTemplateContent) {
-        alert("First load the base gcode");
+    if (!appState.gcodeTemplateContent) {
         return artGcode;
     }
-
-    const lines = gcodeTemplateContent.split(/\r?\n/);
+    
+    const lines = appState.gcodeTemplateContent.split(/\r?\n/);
     let startIndex = -1;
     let endIndex = -1;
-
-    // SCANSIONE: Cerca SOLO i nuovi marker definitivi
+    
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].toUpperCase();
-
-        // Cerca start anche se ci sono altri caratteri nella riga
+        
         if (line.includes(";START_ART")) {
             startIndex = i;
         }
-        // Cerca end anche se ci sono altri caratteri nella riga
         if (line.includes(";END_ART")) {
             endIndex = i;
         }
     }
-
-    // Se manca lo START, blocchiamo tutto
+    
     if (startIndex === -1) {
-        alert("Didn't found marker ;START_ART in the base gcode.");
-        return gcodeTemplateContent + "\n" + artGcode;
+        console.warn("Marker ;START_ART not found in template");
+        return appState.gcodeTemplateContent + "\n" + artGcode;
     }
-
-    // HEADER: Tutto fino allo START compreso
+    
     const header = lines.slice(0, startIndex + 1).join("\n");
-
-    // FOOTER: Tutto dall'END compreso in poi (se esiste)
+    
     let footer = "";
     if (endIndex !== -1 && endIndex > startIndex) {
         footer = lines.slice(endIndex).join("\n");
     } else {
-        // Fallback solo se ti sei dimenticato di scrivere END_ART
         footer = lines.slice(startIndex + 1).join("\n");
     }
-
-    // RECUPERO VARIABILI UI
-    const mode = document.getElementById("filamentChangeMode")?.value || "manual";
-    const amsBaseSlot = document.getElementById("amsBaseSlot")?.value || "T0";
-    // const amsDrawingSlot = document.getElementById("amsDrawingSlot")?.value || "T1"; // Non serve qui
-
-    // GENERAZIONE COMANDO CAMBIO
+    
+    const mode = getElement("filamentChangeMode")?.value || "manual";
+    
     let changeCommand = "";
-
-    if (mode === "ams") {
-        // --- FIX: In modalità AMS non aggiungiamo nulla qui ---
-        // La funzione processImage() ha già inserito il comando corretto (T2 o T3)
-        // come primissima riga di 'artGcode'.
-        changeCommand = "";
-    } else {
-        // In manuale manteniamo la pausa M600 per permettere il cambio filo
-        changeCommand = "\n; --- PAUSA MANUALE ---\nM600\n";
+    if (mode === "manual") {
+        changeCommand = "\n; --- MANUAL PAUSE ---\nM600\n";
     }
-
-    // COSTRUZIONE FINALE
+    
     let finalGcode = header + changeCommand + "\n; --- START ARTWORK ---\n" + artGcode + "\n; --- END ARTWORK ---\n";
-
+    
     return finalGcode + footer;
 }
 
-// --- INITIALIZATION ---
+// ==================== INITIALIZATION ====================
+
 document.addEventListener("DOMContentLoaded", () => {
-    setupImageManipulationHandlers?.();
-
-    document.getElementById("generateBtn")?.addEventListener("click", processImage);
-    document.getElementById("downloadBtn")?.addEventListener("click", downloadGcode);
-
-    // Eventi UI minori
-    ["hilbertOrder", "gamma"].forEach((id) => {
-        document.getElementById(id)?.addEventListener("input", (e) => {
-            const display = document.getElementById(id === "hilbertOrder" ? "orderVal" : "gammaVal");
-            if (display) display.innerText = e.target.value;
+    console.log("✅ G-Code Art Generator (Improved) initialized");
+    
+    setupImageManipulationHandlers();
+    
+    const generateBtn = getElement("generateBtn");
+    if (generateBtn) {
+        generateBtn.addEventListener("click", processImage);
+    }
+    
+    const downloadBtn = getElement("downloadBtn");
+    if (downloadBtn) {
+        downloadBtn.addEventListener("click", downloadGcode);
+    }
+    
+    // Slider value displays
+    const hilbertOrder = getElement("hilbertOrder");
+    const orderVal = getElement("orderVal");
+    if (hilbertOrder && orderVal) {
+        hilbertOrder.addEventListener("input", (e) => {
+            orderVal.innerText = e.target.value;
         });
+    }
+    
+    const gamma = getElement("gamma");
+    const gammaVal = getElement("gammaVal");
+    if (gamma && gammaVal) {
+        gamma.addEventListener("input", (e) => {
+            gammaVal.innerText = parseFloat(e.target.value).toFixed(1);
+        });
+    }
+    
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            const btn = getElement("generateBtn");
+            if (btn && !btn.disabled) {
+                btn.click();
+            }
+        }
+        
+        if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+            const btn = getElement("downloadBtn");
+            if (btn && btn.style.display !== "none") {
+                e.preventDefault();
+                btn.click();
+            }
+        }
     });
+    
+    console.log("💡 Keyboard shortcuts: Ctrl+Enter (Generate) | Ctrl+S (Download)");
 });
