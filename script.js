@@ -12,6 +12,25 @@ const ZOOM_FACTOR = 1.1;
 
 // ==================== UTILITY FUNCTIONS ====================
 
+// Inject UI animation styles once at load time
+(function injectStyles() {
+    const style = document.createElement("style");
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; transform: translateX(400px); }
+        }
+        .error-toast.fade-out {
+            animation: fadeOut 0.3s ease forwards;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    `;
+    document.head.appendChild(style);
+})();
+
 /**
  * Safely parse float with validation
  */
@@ -85,28 +104,11 @@ function showErrorMessage(message) {
         </div>
     `;
 
-    const style = document.createElement("style");
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(400px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .error-toast.fade-out {
-            animation: fadeOut 0.3s ease forwards;
-        }
-        @keyframes fadeOut {
-            to { opacity: 0; transform: translateX(400px); }
-        }
-    `;
-    document.head.appendChild(style);
     document.body.appendChild(toast);
 
     setTimeout(() => {
         toast.classList.add("fade-out");
-        setTimeout(() => {
-            toast.remove();
-            style.remove();
-        }, 300);
+        setTimeout(() => toast.remove(), 300);
     }, 5000);
 }
 
@@ -156,9 +158,6 @@ function showLoadingSpinner() {
         </div>
     `;
 
-    const style = document.createElement("style");
-    style.textContent = "@keyframes spin { to { transform: rotate(360deg); } }";
-    document.head.appendChild(style);
     document.body.appendChild(spinner);
 }
 
@@ -371,14 +370,29 @@ function getBrightnessAtUV(u_print, v_print_yup, pixels, anaW, anaH, gammaVal) {
     u_source = Math.max(0, Math.min(1, u_source));
     v_source = Math.max(0, Math.min(1, v_source));
 
-    const x = Math.floor(u_source * (anaW - 1));
-    const y = Math.floor(v_source * (anaH - 1));
+    // Bilinear interpolation
+    const xf = u_source * (anaW - 1);
+    const yf = v_source * (anaH - 1);
+    const x0 = Math.floor(xf);
+    const y0 = Math.floor(yf);
+    const x1 = Math.min(x0 + 1, anaW - 1);
+    const y1 = Math.min(y0 + 1, anaH - 1);
+    const tx = xf - x0;
+    const ty = yf - y0;
 
-    const idx = (y * anaW + x) * 4;
+    function pixelBrightness(px, py) {
+        const idx = (py * anaW + px) * 4;
+        return (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3.0;
+    }
 
-    const avgColor = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3.0;
+    const c00 = pixelBrightness(x0, y0);
+    const c10 = pixelBrightness(x1, y0);
+    const c01 = pixelBrightness(x0, y1);
+    const c11 = pixelBrightness(x1, y1);
+
+    const avgColor = c00 * (1 - tx) * (1 - ty) + c10 * tx * (1 - ty) + c01 * (1 - tx) * ty + c11 * tx * ty;
+
     let val = avgColor / 255.0;
-
     val = Math.pow(val, 1.0 / gammaVal);
 
     return 1.0 - val;
@@ -713,6 +727,15 @@ function generateCircularBase(params) {
         const fillLimitRadius = baseRadius - numWalls * wallSpacing;
         const infillTotalHeight = fillLimitRadius * 2;
 
+        // Move to fill start, lower Z and recover retract once
+        const firstY = centerY - fillLimitRadius;
+        const firstXLimit = 0; // at the very edge xLimit ≈ 0
+        gcode.push(`G0 X${(centerX).toFixed(3)} Y${firstY.toFixed(3)} F6000`);
+        gcode.push(`G1 Z${z.toFixed(3)} F1000`);
+        gcode.push(`G1 E0.9 F3000`);
+        prevX = centerX;
+        prevY = firstY;
+
         for (let yRel = -fillLimitRadius; yRel <= fillLimitRadius; yRel += baseOverlap) {
             const xLimit = Math.sqrt(Math.max(0, Math.pow(fillLimitRadius, 2) - Math.pow(yRel, 2)));
             const xLeft = centerX - xLimit;
@@ -725,15 +748,7 @@ function generateCircularBase(params) {
             }
 
             if (goingRight) {
-                if (yRel === -fillLimitRadius || Math.abs(yRel + fillLimitRadius) < 0.01) {
-                    gcode.push(`G0 X${xLeft.toFixed(3)} Y${currentY.toFixed(3)} F6000`);
-                    gcode.push(`G1 Z${z.toFixed(3)} F1000`);
-                    gcode.push(`G1 E0.9 F3000`);
-                    prevX = xLeft;
-                    prevY = currentY;
-                } else {
-                    writeBaseSegment(xLeft, currentY, currentSpeed);
-                }
+                writeBaseSegment(xLeft, currentY, currentSpeed);
                 writeBaseSegment(xRight, currentY, currentSpeed);
             } else {
                 writeBaseSegment(xRight, currentY, currentSpeed);
@@ -954,13 +969,21 @@ function generateRectangularBase(params) {
         gcode.push(`G0 Z${(z + 0.4).toFixed(3)} F6000`);
 
         // Rectangular infill
-        let goingRight = true;
         const innerMargin = numWalls * wallSpacing;
         const fillX0 = offsetX + innerMargin;
         const fillY0 = offsetY + innerMargin;
         const fillX1 = offsetX + printWidth - innerMargin;
         const fillY1 = offsetY + printHeight - innerMargin;
         const fillHeight = fillY1 - fillY0;
+
+        // Move to fill start, lower Z and recover retract once
+        gcode.push(`G0 X${fillX0.toFixed(3)} Y${fillY0.toFixed(3)} F6000`);
+        gcode.push(`G1 Z${z.toFixed(3)} F1000`);
+        gcode.push(`G1 E0.9 F3000`);
+        prevX = fillX0;
+        prevY = fillY0;
+
+        let goingRight = true;
 
         for (let yRel = fillY0; yRel <= fillY1; yRel += baseOverlap) {
             let currentSpeed = baseSpeed;
@@ -969,19 +992,11 @@ function generateRectangularBase(params) {
             }
 
             if (goingRight) {
-                if (yRel === fillY0) {
-                    gcode.push(`G0 X${fillX0.toFixed(3)} Y${yRel.toFixed(3)} F6000`);
-                    gcode.push(`G1 Z${z.toFixed(3)} F1000`);
-                    gcode.push(`G1 E0.9 F3000`);
-                    prevX = fillX0;
-                    prevY = yRel;
-                } else {
-                    writeBaseSegment(fillX0, yRel, currentSpeed);
-                }
-                writeBaseSegment(fillX1 - 0.1, yRel, currentSpeed);
+                writeBaseSegment(fillX0, yRel, currentSpeed);
+                writeBaseSegment(fillX1, yRel, currentSpeed);
             } else {
                 writeBaseSegment(fillX1, yRel, currentSpeed);
-                writeBaseSegment(fillX0 + 0.1, yRel, currentSpeed);
+                writeBaseSegment(fillX0, yRel, currentSpeed);
             }
             goingRight = !goingRight;
         }
@@ -1128,7 +1143,8 @@ function processImageCore() {
     const baseRadius = printDim / 2;
     const centerX = offsetX + printWidth / 2;
     const centerY = offsetY + printHeight / 2;
-    let innerRadius = Math.max(0, baseRadius - baseMargin);
+    // innerRadius is updated after base generation; default 0 means no clipping when base is disabled
+    let innerRadius = 0;
 
     previewCanvas.width = bedSize * PREVIEW_SCALE;
     previewCanvas.height = bedSize * PREVIEW_SCALE;
@@ -1712,32 +1728,12 @@ function init3DPreview() {
             if (!appState.threeCamera) return;
             e.preventDefault();
 
-            const rect = dom.getBoundingClientRect();
-
-            const mouse = new THREE.Vector2(
-                ((e.clientX - rect.left) / rect.width) * 2 - 1,
-                -((e.clientY - rect.top) / rect.height) * 2 + 1
-            );
-
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(mouse, appState.threeCamera);
-
-            const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-            const intersection = new THREE.Vector3();
-            raycaster.ray.intersectPlane(plane, intersection);
-
-            if (!intersection) return;
-
             const zoomFactor = 1 + e.deltaY * 0.001;
-            const newRadius = THREE.MathUtils.clamp(appState.threeOrbitRadius * zoomFactor, 20, 2000);
-
-            const scale = newRadius / appState.threeOrbitRadius;
-            appState.threeOrbitRadius = newRadius;
-
-            const offset = new THREE.Vector3().subVectors(intersection, appState.threeTarget).multiplyScalar(1 - scale);
-
-            appState.threeTarget.add(offset);
-            appState.threeCamera.position.add(offset);
+            appState.threeOrbitRadius = THREE.MathUtils.clamp(
+                appState.threeOrbitRadius * zoomFactor,
+                20,
+                2000
+            );
 
             updateThreeCameraFromOrbit();
         },
