@@ -298,8 +298,12 @@ function updatePrintWidthFromHeight(newHeight) {
 /**
  * Draw image slice preview on canvas
  */
-function drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight) {
+function drawImageSlicePreview(bedWidth, bedHeight, originAtCenter, offsetX, offsetY, printWidth, printHeight) {
     if (!appState.originalImage || !previewCtx) return;
+
+    // For display purposes, center-origin coords are shifted by half bed size
+    const dispOX = originAtCenter ? bedWidth / 2 : 0;
+    const dispOY = originAtCenter ? bedHeight / 2 : 0;
 
     try {
         previewCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -311,7 +315,7 @@ function drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeigh
         // Draw bed boundary
         previewCtx.strokeStyle = "#cbd5e1";
         previewCtx.lineWidth = 1;
-        previewCtx.strokeRect(0, 0, bedSize, bedSize);
+        previewCtx.strokeRect(0, 0, bedWidth, bedHeight);
 
         const hideImageOverlay = getElement("hideImageOverlay");
         const hideImageOverlayChecked = hideImageOverlay ? hideImageOverlay.checked : false;
@@ -323,7 +327,7 @@ function drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeigh
             const sH_norm = 1.0 / appState.imageZoom;
 
             previewCtx.save();
-            previewCtx.translate(offsetX, offsetY);
+            previewCtx.translate(offsetX + dispOX, offsetY + dispOY);
             previewCtx.scale(1, -1);
             previewCtx.translate(0, -printHeight);
 
@@ -352,7 +356,7 @@ function drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeigh
 
         previewCtx.strokeStyle = "#ef4444";
         previewCtx.lineWidth = 1;
-        previewCtx.strokeRect(offsetX, offsetY, printWidth, printHeight);
+        previewCtx.strokeRect(offsetX + dispOX, offsetY + dispOY, printWidth, printHeight);
     } catch (error) {
         console.error("Error drawing preview:", error);
     }
@@ -407,13 +411,14 @@ function setupImageManipulationHandlers() {
     if (!previewCanvas) return;
 
     const getPrintParams = () => {
-        const bedSizeElem = getElement("bedSize");
-        const bedSize = safeParseFloat(bedSizeElem?.value, 250, 50, 500);
-        const printWidth = safeParseFloat(printWidthInput?.value, 100, 1, bedSize);
-        const printHeight = safeParseFloat(printHeightInput?.value, 100, 1, bedSize);
-        const offsetX = (bedSize - printWidth) / 2;
-        const offsetY = (bedSize - printHeight) / 2;
-        return { bedSize, printWidth, printHeight, offsetX, offsetY };
+        const bedWidth = safeParseFloat(getElement("bedWidth")?.value, 250, 50, 1000);
+        const bedHeight = safeParseFloat(getElement("bedHeight")?.value, 250, 50, 1000);
+        const originAtCenter = getElement("originAtCenter")?.checked ?? false;
+        const printWidth = safeParseFloat(printWidthInput?.value, 100, 1, bedWidth);
+        const printHeight = safeParseFloat(printHeightInput?.value, 100, 1, bedHeight);
+        const offsetX = originAtCenter ? -printWidth / 2 : (bedWidth - printWidth) / 2;
+        const offsetY = originAtCenter ? -printHeight / 2 : (bedHeight - printHeight) / 2;
+        return { bedWidth, bedHeight, originAtCenter, printWidth, printHeight, offsetX, offsetY };
     };
 
     previewCanvas.addEventListener("mousedown", (e) => {
@@ -434,7 +439,7 @@ function setupImageManipulationHandlers() {
     previewCanvas.addEventListener("mousemove", (e) => {
         if (!appState.isDragging || !appState.originalImage) return;
 
-        const { bedSize, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
+        const { bedWidth, bedHeight, originAtCenter, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
 
         const dx = e.clientX - appState.lastMouseX;
         const dy = e.clientY - appState.lastMouseY;
@@ -454,7 +459,7 @@ function setupImageManipulationHandlers() {
         appState.imageOffsetX = Math.max(0, Math.min(maxOffset, appState.imageOffsetX));
         appState.imageOffsetY = Math.max(0, Math.min(maxOffset, appState.imageOffsetY));
 
-        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+        drawImageSlicePreview(bedWidth, bedHeight, originAtCenter, offsetX, offsetY, printWidth, printHeight);
     });
 
     previewCanvas.addEventListener(
@@ -463,7 +468,7 @@ function setupImageManipulationHandlers() {
             if (!appState.originalImage) return;
             e.preventDefault();
 
-            const { bedSize, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
+            const { bedWidth, bedHeight, originAtCenter, printWidth, printHeight, offsetX, offsetY } = getPrintParams();
 
             const rect = previewCanvas.getBoundingClientRect();
             const mouseX_mm = (e.clientX - rect.left) / PREVIEW_SCALE;
@@ -495,7 +500,7 @@ function setupImageManipulationHandlers() {
             appState.imageOffsetX = newOffsetX;
             appState.imageOffsetY = newOffsetY;
 
-            drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+            drawImageSlicePreview(bedWidth, bedHeight, originAtCenter, offsetX, offsetY, printWidth, printHeight);
         },
         { passive: false }
     );
@@ -549,18 +554,19 @@ if (imageInput) {
                     appState.imageOffsetY = 0.0;
 
                     // Update preview
-                    const bedSizeElem = getElement("bedSize");
-                    const bedSize = safeParseFloat(bedSizeElem?.value, 250, 50, 500);
+                    const bedWidth = safeParseFloat(getElement("bedWidth")?.value, 250, 50, 1000);
+                    const bedHeight = safeParseFloat(getElement("bedHeight")?.value, 250, 50, 1000);
+                    const originAtCenter = getElement("originAtCenter")?.checked ?? false;
 
                     if (previewCanvas) {
-                        previewCanvas.width = bedSize * PREVIEW_SCALE;
-                        previewCanvas.height = bedSize * PREVIEW_SCALE;
+                        previewCanvas.width = bedWidth * PREVIEW_SCALE;
+                        previewCanvas.height = bedHeight * PREVIEW_SCALE;
 
                         const printWidth = safeParseFloat(printWidthInput?.value, 100);
                         const printHeight = safeParseFloat(printHeightInput?.value, 100);
-                        const offsetX = (bedSize - printWidth) / 2;
-                        const offsetY = (bedSize - printHeight) / 2;
-                        drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+                        const offsetX = originAtCenter ? -printWidth / 2 : (bedWidth - printWidth) / 2;
+                        const offsetY = originAtCenter ? -printHeight / 2 : (bedHeight - printHeight) / 2;
+                        drawImageSlicePreview(bedWidth, bedHeight, originAtCenter, offsetX, offsetY, printWidth, printHeight);
                     }
                 } catch (error) {
                     console.error("Error processing image:", error);
@@ -1068,10 +1074,12 @@ function processImageCore() {
     const filamentDia = safeParseFloat(getElement("filamentDia")?.value, 1.75, 0.1, 5);
     const layerHeight = safeParseFloat(getElement("layerHeight")?.value, 0.2, 0.05, 1);
     const zOffset = safeParseFloat(getElement("zOffset")?.value, 0.2, 0, 50);
-    const bedSize = safeParseFloat(getElement("bedSize")?.value, 250, 50, 500);
+    const bedWidth = safeParseFloat(getElement("bedWidth")?.value, 250, 50, 1000);
+    const bedHeight = safeParseFloat(getElement("bedHeight")?.value, 250, 50, 1000);
+    const originAtCenter = getElement("originAtCenter")?.checked ?? false;
 
-    const printWidth = safeParseFloat(printWidthInput?.value, 100, 1, bedSize);
-    const printHeight = safeParseFloat(printHeightInput?.value, 100, 1, bedSize);
+    const printWidth = safeParseFloat(printWidthInput?.value, 100, 1, bedWidth);
+    const printHeight = safeParseFloat(printHeightInput?.value, 100, 1, bedHeight);
 
     const spacing = safeParseFloat(getElement("lineSpacing")?.value, 0.6, 0.1, 10);
     if (spacing <= 0) {
@@ -1137,8 +1145,9 @@ function processImageCore() {
         appState.cachedDimensions = { width: anaW, height: anaH };
     }
 
-    const offsetX = (bedSize - printWidth) / 2;
-    const offsetY = (bedSize - printHeight) / 2;
+    // Compute offsets: center origin uses negative half-dimensions, corner uses centered on bed
+    const offsetX = originAtCenter ? -printWidth / 2  : (bedWidth  - printWidth)  / 2;
+    const offsetY = originAtCenter ? -printHeight / 2 : (bedHeight - printHeight) / 2;
     const filArea = Math.PI * Math.pow(filamentDia / 2, 2);
     const safeZ = zOffset + 5.0;
     let totalE = 0;
@@ -1150,12 +1159,16 @@ function processImageCore() {
     // innerRadius is updated after base generation; default 0 means no clipping when base is disabled
     let innerRadius = 0;
 
-    previewCanvas.width = bedSize * PREVIEW_SCALE;
-    previewCanvas.height = bedSize * PREVIEW_SCALE;
-    drawImageSlicePreview(bedSize, offsetX, offsetY, printWidth, printHeight);
+    previewCanvas.width = bedWidth * PREVIEW_SCALE;
+    previewCanvas.height = bedHeight * PREVIEW_SCALE;
+    drawImageSlicePreview(bedWidth, bedHeight, originAtCenter, offsetX, offsetY, printWidth, printHeight);
 
     // Draw base preview if enabled
     if (addCircularBase) {
+        // Display offset: center-origin coords need shifting for canvas display
+        const dispOX = originAtCenter ? bedWidth / 2 : 0;
+        const dispOY = originAtCenter ? bedHeight / 2 : 0;
+
         previewCtx.strokeStyle = "rgba(100,100,100,0.5)";
         previewCtx.lineWidth = 1 / PREVIEW_SCALE;
         previewCtx.setLineDash([4, 4]);
@@ -1163,18 +1176,18 @@ function processImageCore() {
         if (pathType === "spiral") {
             // Circular preview
             previewCtx.beginPath();
-            previewCtx.arc(centerX, centerY, baseRadius, 0, TWO_PI);
+            previewCtx.arc(centerX + dispOX, centerY + dispOY, baseRadius, 0, TWO_PI);
             previewCtx.stroke();
             previewCtx.strokeStyle = "rgba(37, 99, 235, 0.8)";
             previewCtx.setLineDash([2, 2]);
             previewCtx.beginPath();
-            previewCtx.arc(centerX, centerY, innerRadius, 0, TWO_PI);
+            previewCtx.arc(centerX + dispOX, centerY + dispOY, innerRadius, 0, TWO_PI);
             previewCtx.stroke();
         } else if (pathType === "squareSpiral" || pathType === "hilbert") {
             // Square preview
             const centerOffset = {
-                x: centerX - printDim / 2,
-                y: centerY - printDim / 2
+                x: centerX - printDim / 2 + dispOX,
+                y: centerY - printDim / 2 + dispOY
             };
             previewCtx.strokeRect(centerOffset.x, centerOffset.y, printDim, printDim);
             previewCtx.strokeStyle = "rgba(37, 99, 235, 0.8)";
@@ -1183,11 +1196,11 @@ function processImageCore() {
             previewCtx.strokeRect(centerOffset.x + ins, centerOffset.y + ins, printDim - 2 * ins, printDim - 2 * ins);
         } else {
             // Rectangular preview (for zigzag, diagonal)
-            previewCtx.strokeRect(offsetX, offsetY, printWidth, printHeight);
+            previewCtx.strokeRect(offsetX + dispOX, offsetY + dispOY, printWidth, printHeight);
             previewCtx.strokeStyle = "rgba(37, 99, 235, 0.8)";
             previewCtx.setLineDash([2, 2]);
             const ins = Math.min(baseMargin, printWidth / 2, printHeight / 2);
-            previewCtx.strokeRect(offsetX + ins, offsetY + ins, printWidth - 2 * ins, printHeight - 2 * ins);
+            previewCtx.strokeRect(offsetX + dispOX + ins, offsetY + dispOY + ins, printWidth - 2 * ins, printHeight - 2 * ins);
         }
         previewCtx.setLineDash([]);
     }
@@ -1298,11 +1311,14 @@ function processImageCore() {
             gcode.push(`${amsDrawingSlot}`);
             gcode.push(`M400`);
         } else {
+            // Park at bed center — safe regardless of origin position or bed size
+            const parkX = originAtCenter ? 0 : bedWidth / 2;
+            const parkY = originAtCenter ? 0 : bedHeight / 2;
             gcode.push(`G91`);
             gcode.push(`G1 E-5 F3000`);
             gcode.push(`G1 Z10 F1000`);
             gcode.push(`G90`);
-            gcode.push(`G0 X0 Y0 F6000`);
+            gcode.push(`G0 X${parkX.toFixed(3)} Y${parkY.toFixed(3)} F6000 ; Park at bed center for filament change`);
             gcode.push(`M600`);
         }
 
@@ -1332,14 +1348,18 @@ function processImageCore() {
         prevY = startPoint.y;
     }
 
+    // Display offset: for center-origin printers, shift canvas drawing by half bed size
+    const dispOX = originAtCenter ? bedWidth / 2 : 0;
+    const dispOY = originAtCenter ? bedHeight / 2 : 0;
+
     function writeMove(x, y, targetW, targetF, isTravel = false) {
         const dist = Math.hypot(x - prevX, y - prevY);
 
         if (isTravel || dist < 0.01) {
             gcode.push(`G0 X${x.toFixed(3)} Y${y.toFixed(3)} F6000`);
             previewCtx.beginPath();
-            previewCtx.moveTo(prevX, prevY);
-            previewCtx.lineTo(x, y);
+            previewCtx.moveTo(prevX + dispOX, prevY + dispOY);
+            previewCtx.lineTo(x + dispOX, y + dispOY);
             previewCtx.lineWidth = 1 / PREVIEW_SCALE;
             previewCtx.lineCap = "round";
             previewCtx.strokeStyle = `rgba(0,0,0, 0.4)`;
@@ -1351,8 +1371,8 @@ function processImageCore() {
             totalE += e;
 
             previewCtx.beginPath();
-            previewCtx.moveTo(prevX, prevY);
-            previewCtx.lineTo(x, y);
+            previewCtx.moveTo(prevX + dispOX, prevY + dispOY);
+            previewCtx.lineTo(x + dispOX, y + dispOY);
             previewCtx.lineWidth = targetW;
             previewCtx.lineCap = "round";
             previewCtx.strokeStyle = `rgba(0,0,0, 0.9)`;
@@ -1887,11 +1907,17 @@ function update3DPreviewFromGcode(gcode) {
         appState.threeMesh.material.dispose();
     }
 
-    const bedSize = 250;
-    const scale = 120 / bedSize;
-    const cx = bedSize / 2;
-    const cy = bedSize / 2;
+    const bedWidth = safeParseFloat(getElement("bedWidth")?.value, 250, 50, 1000);
+    const bedHeight = safeParseFloat(getElement("bedHeight")?.value, 250, 50, 1000);
+    const originAtCenter = getElement("originAtCenter")?.checked ?? false;
+
+    // For corner-origin: center is at bedWidth/2, bedHeight/2
+    // For center-origin: coordinates are already centered around 0
+    const cx = originAtCenter ? 0 : bedWidth / 2;
+    const cy = originAtCenter ? 0 : bedHeight / 2;
     const cz = 0;
+
+    const scale = 120 / Math.max(bedWidth, bedHeight);
 
     const positions = new Float32Array(segments.length * 6);
     const colors = new Float32Array(segments.length * 6);
