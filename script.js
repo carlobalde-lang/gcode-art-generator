@@ -1111,6 +1111,10 @@ function processImageCore() {
     const baseMargin = safeParseFloat(getElement("baseMargin")?.value, 2, 0, 100);
     const baseLayers = safeParseInt(getElement("baseLayers")?.value, 2, 1, 20);
 
+    const textModeElem = getElement("textMode");
+    const textMode = textModeElem ? textModeElem.checked : false;
+    const textThreshold = safeParseFloat(getElement("textThreshold")?.value, 0.4, 0.05, 0.95);
+
     const anaW = appState.originalImage.width;
     const anaH = appState.originalImage.height;
 
@@ -1402,6 +1406,18 @@ function processImageCore() {
 
         const darkness = getBrightnessAtUV(u_sample, v_sample_yup, pixels, anaW, anaH, gammaVal);
 
+        // Text mode: binary threshold — either full width or skip (no travel artifacts on white)
+        if (textMode && !isConnect) {
+            if (darkness < textThreshold) {
+                // Light pixel: lift and travel, no extrusion
+                writeMove(x, y, 0, 0, true);
+            } else {
+                // Dark pixel: print at full width, slow speed for sharpness
+                writeMove(x, y, maxW, minSpeed, false);
+            }
+            return;
+        }
+
         const targetW = minW + darkness * (maxW - minW);
         const targetF = maxSpeed - darkness * (maxSpeed - minSpeed);
 
@@ -1497,49 +1513,55 @@ function processImageCore() {
             doSmartMove(currentOffset.x + currentSize / 2, currentOffset.y + currentSize / 2);
         }
     } else if (pathType === "diagonal") {
+        // Continuous diagonal zigzag — no G0 travel between lines, reverses direction at each edge.
+        // Much better for text: no retract blobs on white areas, smoother transitions.
         const axisStep = spacing * Math.sqrt(2);
         const maxSum = printWidth + printHeight;
         const numDiagonals = Math.floor(maxSum / axisStep);
+        const segRes = 0.5; // mm per sub-segment
 
         for (let i = 0; i <= numDiagonals; i++) {
-            let sum = i * axisStep;
+            const sum = i * axisStep;
 
+            // Compute the two endpoints of this diagonal on the rectangle boundary
             let p1x = sum <= printHeight ? 0 : sum - printHeight;
             let p1y = sum <= printHeight ? sum : printHeight;
-            let p2x = sum <= printWidth ? sum : printWidth;
-            let p2y = sum <= printWidth ? 0 : sum - printWidth;
+            let p2x = sum <= printWidth  ? sum : printWidth;
+            let p2y = sum <= printWidth  ? 0   : sum - printWidth;
 
+            // Clamp to rect
+            p1x = Math.max(0, Math.min(printWidth,  p1x));
+            p1y = Math.max(0, Math.min(printHeight, p1y));
+            p2x = Math.max(0, Math.min(printWidth,  p2x));
+            p2y = Math.max(0, Math.min(printHeight, p2y));
+
+            // Alternate direction each line
             let startX, startY, endX, endY;
             if (i % 2 === 0) {
-                startX = p1x;
-                startY = p1y;
-                endX = p2x;
-                endY = p2y;
+                startX = p1x; startY = p1y; endX = p2x; endY = p2y;
             } else {
-                startX = p2x;
-                startY = p2y;
-                endX = p1x;
-                endY = p1y;
-            }
-
-            startX = Math.max(0, Math.min(printWidth, startX));
-            startY = Math.max(0, Math.min(printHeight, startY));
-            endX = Math.max(0, Math.min(printWidth, endX));
-            endY = Math.max(0, Math.min(printHeight, endY));
-
-            if (i > 0) {
-                doSmartMove(offsetX + startX, offsetY + startY, true);
+                startX = p2x; startY = p2y; endX = p1x; endY = p1y;
             }
 
             const distLine = Math.hypot(endX - startX, endY - startY);
+            if (distLine < 0.01) continue;
 
-            if (distLine > 0.01) {
-                const numSegs = Math.max(2, Math.floor(distLine / 0.5));
+            // On the very first line, do a travel to start position
+            if (i === 0) {
+                doSmartMove(offsetX + startX, offsetY + startY, true);
+            }
+            // For subsequent lines: connect end of previous line to start of this line.
+            // This is a short diagonal step (~axisStep mm) — use doSmartMove so it also
+            // samples brightness (continuous path, no retract blobs).
+            else {
+                doSmartMove(offsetX + startX, offsetY + startY);
+            }
 
-                for (let k = 1; k <= numSegs; k++) {
-                    let t = k / numSegs;
-                    doSmartMove(offsetX + startX + (endX - startX) * t, offsetY + startY + (endY - startY) * t);
-                }
+            // Draw the diagonal line with sub-segments for brightness sampling
+            const numSegs = Math.max(2, Math.floor(distLine / segRes));
+            for (let k = 1; k <= numSegs; k++) {
+                const t = k / numSegs;
+                doSmartMove(offsetX + startX + (endX - startX) * t, offsetY + startY + (endY - startY) * t);
             }
         }
     } else if (pathType === "spiral") {
@@ -2008,6 +2030,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (gamma && gammaVal) {
         gamma.addEventListener("input", (e) => {
             gammaVal.innerText = parseFloat(e.target.value).toFixed(1);
+        });
+    }
+
+    const textThresholdSlider = getElement("textThreshold");
+    const textThresholdVal = getElement("textThresholdVal");
+    if (textThresholdSlider && textThresholdVal) {
+        textThresholdSlider.addEventListener("input", (e) => {
+            textThresholdVal.innerText = parseFloat(e.target.value).toFixed(2);
+        });
+    }
+
+    // Toggle text mode options visibility
+    const textModeCheckbox = getElement("textMode");
+    const textModeOptions = getElement("textModeOptions");
+    if (textModeCheckbox && textModeOptions) {
+        textModeCheckbox.addEventListener("change", (e) => {
+            textModeOptions.style.display = e.target.checked ? "block" : "none";
         });
     }
 
