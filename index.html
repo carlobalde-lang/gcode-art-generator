@@ -162,7 +162,7 @@
             <!-- Notice banner -->
             <div
                 class="col-span-full rounded-r-lg border-l-4 border-blue-500 bg-gradient-notice text-blue-900 px-4 py-3 text-sm shadow-sm">
-                ⚠️ <strong>ATTENTION:</strong> Use this code at your own risk! The code generate the center of the bed of a printer with 0,0 in the front left corner.
+                ⚠️ <strong>ATTENTION:</strong> Use this code at your own risk!
             </div>
 
             <!-- Left panel: controls -->
@@ -294,12 +294,39 @@
                         <div
                             class="control-group rounded-lg bg-gradient-to-r from-blue-100 to-sky-100 p-4 border border-blue-300 border-l-4 border-l-blue-500">
                             <label class="block text-sm font-semibold text-blue-900 mb-2">📐 Bed Size (mm)</label>
-                            <input
-                                type="number"
-                                id="bedSize"
-                                value="250"
-                                title="Total X/Y bed dimensions"
-                                class="input-elegant" />
+                            <div class="flex gap-3 mb-3">
+                                <div class="flex-1">
+                                    <label class="block text-xs font-medium text-blue-700 mb-1">Width (X)</label>
+                                    <input
+                                        type="number"
+                                        id="bedWidth"
+                                        value="250"
+                                        min="50"
+                                        step="1"
+                                        title="Bed width (X axis)"
+                                        class="input-elegant" />
+                                </div>
+                                <div class="flex-1">
+                                    <label class="block text-xs font-medium text-blue-700 mb-1">Height (Y)</label>
+                                    <input
+                                        type="number"
+                                        id="bedHeight"
+                                        value="250"
+                                        min="50"
+                                        step="1"
+                                        title="Bed height (Y axis)"
+                                        class="input-elegant" />
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 rounded-lg bg-white/60 p-2.5 border border-blue-200">
+                                <input
+                                    type="checkbox"
+                                    id="originAtCenter"
+                                    class="w-4 h-4 rounded border-blue-300 text-primary focus:ring-primary accent-blue-600" />
+                                <label for="originAtCenter" class="text-sm font-medium text-blue-900 cursor-pointer select-none">
+                                    Origin at center (Delta / CoreXY)
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -661,6 +688,17 @@
                         id="preview3dContainer"
                         class="w-full aspect-square rounded-lg bg-slate-900/90 border border-blue-500/40 overflow-hidden"></div>
                 </div>
+
+                <div class="mt-6 text-left">
+                    <h4 class="text-sm font-semibold text-blue-900 mb-1">Generated G-code</h4>
+                    <p class="text-xs text-blue-700 mb-2">Generated G-code will appear here after clicking "Generate Preview".</p>
+                    <textarea
+                        id="gcodeOutput"
+                        rows="12"
+                        readonly
+                        placeholder="G-code will appear here..."
+                        class="w-full rounded-lg border border-blue-200 bg-slate-50 text-xs font-mono text-slate-700 p-3 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y"></textarea>
+                </div>
             </div>
         </div>
 
@@ -754,7 +792,6 @@
         </script>
 
         <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-        <script src="https://carlobalde-lang.github.io/gcode-art-generator/script.js"></script>
+        <script src="script.js"></script>
     </body>
 </html>
-
