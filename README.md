@@ -12,8 +12,7 @@ A high-performance, web-based tool designed to transform images into artistic, F
 
 * **Path-Based Art Algorithms**: Generate complex toolpaths using **Hilbert Curves**, **Spirals**, and **Variable-Density Zigzags**.
 * **FDM-Native Logic**: Unlike standard vectorizers, this tool calculates real-time extrusion volume ($E$ values), handles flow compensation, and manages Z-hops for a clean, string-free finish.
-* **Optimized for AMS**: 
-    * Built-in **AMS slot selection** and `M600` filament change logic.
+* **Optimized for AMS**: Built-in **AMS slot selection** and `M600` filament change logic.
 * **3D Toolpath Preview**: Integrated **Three.js** engine provides an accurate 3D visualization of the print before exporting.
 * **One-Click Base Generation**: Automatically creates a structural base (circular or rectangular) to support the artwork, making the output ready to print immediately.
 * **Client-Side Processing**: 100% browser-based. Your images never leave your computer.
@@ -49,3 +48,4 @@ I am currently looking for partnerships to integrate this technology into establ
 
 
 *Developed with ❤️ for the 3D Printing Community.*
+
