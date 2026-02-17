@@ -1,4 +1,15 @@
 "use strict";
+
+// Inject a blank favicon to suppress 404 console error
+(function injectFavicon() {
+    if (!document.querySelector("link[rel~='icon']")) {
+        const link = document.createElement("link");
+        link.rel = "icon";
+        link.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🖨️</text></svg>";
+        document.head.appendChild(link);
+    }
+})();
+
 // ==================== CONSTANTS ====================
 
 const TWO_PI = 2 * Math.PI;
@@ -11,6 +22,16 @@ const ZOOM_MAX = 10.0;
 const ZOOM_FACTOR = 1.1;
 
 // ==================== UTILITY FUNCTIONS ====================
+
+// Inject a blank favicon to suppress the 404 console error
+(function injectFavicon() {
+    if (!document.querySelector("link[rel~='icon']")) {
+        const link = document.createElement("link");
+        link.rel = "icon";
+        link.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🖨️</text></svg>";
+        document.head.appendChild(link);
+    }
+})();
 
 // Inject UI animation styles once at load time
 (function injectStyles() {
@@ -1675,6 +1696,11 @@ function processImageCore() {
 
 function init3DPreview() {
     if (!window.THREE || appState.threeRenderer) return;
+
+    // Ensure threeTarget is initialized (may have been null if THREE wasn't loaded at script parse time)
+    if (!appState.threeTarget) {
+        appState.threeTarget = new THREE.Vector3(0, 0, 0);
+    }
 
     const container = getElement("preview3dContainer");
     if (!container) return;
